@@ -1,0 +1,127 @@
+---
+# yamllint configuration for platform-live-infra
+# Production-ready linting rules for IaC YAML files
+# Enforces consistency across Terragrunt configs, CI/CD workflows, and documentation
+
+extends: default
+
+# Ignore patterns for generated, vendored, or binary-like files
+ignore: |
+  .terraform/
+  **/.terragrunt-cache/
+  **/node_modules/
+  **/.venv/
+  **/.git/
+  **/vendor/
+
+rules:
+  # Brackets: allow both styles but prefer consistency per file
+  braces:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+    min-spaces-inside-empty: 0
+    max-spaces-inside-empty: 0
+    level: warning
+
+  brackets:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+    min-spaces-inside-empty: 0
+    max-spaces-inside-empty: 0
+    level: warning
+
+  # Colons: standard YAML spacing
+  colons:
+    max-spaces-before: 0
+    max-spaces-after: 1
+
+  # Commas: standard spacing
+  commas:
+    max-spaces-before: 0
+    min-spaces-after: 1
+    max-spaces-after: 1
+
+  # Comments: require space after # and allow standalone comments
+  comments:
+    require-starting-space: true
+    ignore-shebangs: true
+    min-spaces-from-content: 2
+    level: warning
+
+  # Comments indentation: flexible for better documentation
+  comments-indentation:
+    level: warning
+
+  # Document start: optional for flexibility with tools
+  document-start:
+    present: false
+
+  # Document end: not required
+  document-end:
+    present: false
+
+  # Empty lines: reasonable limits
+  empty-lines:
+    max: 2
+    max-start: 0
+    max-end: 1
+
+  # Empty values: forbid implicit nulls for clarity
+  empty-values:
+    forbid-in-block-mappings: true
+    forbid-in-flow-mappings: true
+    level: error
+
+  # Hyphens: consistent spacing for lists
+  hyphens:
+    max-spaces-after: 1
+
+  # Indentation: 2 spaces, consistent with GitHub Actions and common YAML
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+
+  # Key duplicates: critical error - prevent config overwrites
+  key-duplicates:
+    level: error
+
+  # Key ordering: disabled - allow semantic grouping
+  key-ordering: disable
+
+  # Line length: relaxed for long resource names and URLs
+  line-length:
+    max: 150
+    allow-non-breakable-words: true
+    allow-non-breakable-inline-mappings: true
+    level: warning
+
+  # New line at end of file: required for POSIX compliance
+  new-line-at-end-of-file:
+    level: error
+
+  # New lines: Unix-style only
+  new-lines:
+    type: unix
+
+  # Octal values: forbid implicit octals (0755 → "0755" or 0o755)
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: false
+    level: error
+
+  # Quoted strings: flexible - allow both styles
+  quoted-strings:
+    quote-type: any
+    required: false
+    allow-quoted-quotes: true
+
+  # Trailing spaces: not allowed
+  trailing-spaces:
+    level: error
+
+  # Truthy: allow common boolean representations
+  truthy:
+    allowed-values: ['true', 'false', 'yes', 'no', 'on', 'off']
+    check-keys: false
+    level: warning
