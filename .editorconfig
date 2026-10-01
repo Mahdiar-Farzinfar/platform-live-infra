@@ -1,0 +1,116 @@
+root = true
+
+# Repository-wide defaults
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+max_line_length = off
+
+# Terraform and Terragrunt configuration
+[*.{tf,tfvars,hcl}]
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = true
+
+# Go source and module-adjacent files
+[*.go]
+indent_style = tab
+indent_size = tab
+trim_trailing_whitespace = true
+
+# Python scripts and tooling
+[*.py]
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+# POSIX shell scripts
+[*.{sh,bash}]
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = true
+
+# PowerShell scripts and modules
+[*.{ps1,psm1,psd1}]
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+# YAML, including GitHub Actions, inventories, and tool configuration
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = true
+
+# JSON policy and configuration files
+[*.json]
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = true
+
+# Markdown documentation
+# Trailing spaces can be meaningful Markdown hard-break syntax.
+[*.md]
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = false
+
+# CSS stylesheets
+[*.css]
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = true
+
+# Dockerfile
+[Dockerfile]
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = true
+
+# Versioned or specialized Dockerfiles
+[Dockerfile.*]
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = true
+
+# Make recipes must begin with a literal tab.
+[Makefile]
+indent_style = tab
+indent_size = tab
+trim_trailing_whitespace = true
+
+[GNUmakefile]
+indent_style = tab
+indent_size = tab
+trim_trailing_whitespace = true
+
+[*.mk]
+indent_style = tab
+indent_size = tab
+trim_trailing_whitespace = true
+
+# Task and just build files
+[Taskfile.yml]
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = true
+
+[Taskfile.yaml]
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = true
+
+[justfile]
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = true
+
+# Common structured tooling configuration
+[*.toml]
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = true

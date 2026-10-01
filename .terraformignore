@@ -1,0 +1,129 @@
+# .terraformignore
+# Enterprise-grade Terraform ignore patterns for multi-account infrastructure
+
+# Version Control
+.git/
+.gitignore
+.gitattributes
+.gitmodules
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.circleci/
+.travis.yml
+azure-pipelines.yml
+.pre-commit-config.yaml
+
+# Documentation
+docs/
+*.md
+README*
+m
+LICENSE*
+CONTRIBUTING*
+CODE_OF_CONDUCT*
+SECURITY*
+mkdocs.yml
+
+# Development Environment
+.devcontainer/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Build Tools & Task Runners
+Makefile
+Taskfile.yml
+justfile
+go.mod
+go.sum
+
+# Tooling Configurations
+tooling/
+.tool-versions
+.terraform-version
+.terragrunt-version
+.tflint.hcl
+.yamllint.yml
+.checkov.ymlm
+
+# Tooling Configurations
+tooling/
+.tool-versions
+.terraform-version
+.terragrunt-version
+.tflint.hcl
+.yamllint.yml
+.checkov.yml
+.trivyignore
+.mar_test.go
+*_test.py
+test_*.py
+*.tftest.hcl
+
+# Inventory and Metadata
+inventory/
+CODEOWNERS
+
+# Terraform State (should never be in repo, but exclude anyway)
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+.terraform.lock.hcl.backup
+
+# Crash logs
+crash.log
+crash.*.log
+
+# Sensitive files
+*.pem
+*.key
+*.p12
+*.pfx
+secrets.yaml
+secrets.yml
+.env
+.env.*
+!.env.example
+
+# OS-specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.bak
+*.backup
+*~
+.#*
+
+# IDE-specific
+*.sublime-*
+*.code-workspace
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+venv/
+env/
+*.virtualenv
+
+# Go
+vendor/
