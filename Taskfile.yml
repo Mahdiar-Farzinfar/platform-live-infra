@@ -1,0 +1,257 @@
+version: '3'
+
+vars:
+  TARGET: '{{.TARGET | default ""}}'
+  LIVE_ROOT: live
+  TG_SCOPE: '{{.TARGET | default .LIVE_ROOT}}'
+  TF_ARGS: '{{.TF_ARGS | default ""}}'
+  TG_ARGS: '{{.TG_ARGS | default ""}}'
+  CI: '{{.CI | default "false"}}'
+  NON_INTERACTIVE: '{{.NON_INTERACTIVE | default "true"}}'
+  PLAN_FILE: '{{.PLAN_FILE | default "tfplan"}}'
+  PY: '{{if eq OS "windows"}}py -3{{else}}python3{{end}}'
+
+silent: false
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  help:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  verify-env:
+    desc: Verify repository metadata and pinned development tools (read-only)
+    cmds:
+      - python scripts/tools/verify-env.py --root .
+
+  verify:security-baseline:
+    desc: Check the configured security baseline with local Terragrunt renders (not live AWS posture)
+    cmds:
+      - python "{{.ROOT_DIR}}/tests/smoke/verify-security-baseline.py" --root "{{.ROOT_DIR}}" --terragrunt "{{.TERRAGRUNT | default "terragrunt"}}" --timeout "{{.TIMEOUT | default "90"}}" {{if eq .JSON "true"}}--json{{end}}
+
+  verify:post-apply:
+    desc: Check one inventory stack and the configured security baseline; report live checks as pending
+    silent: true
+    env:
+      STACK_ID: '{{.STACK_ID}}'
+    cmds:
+      - '{{.PY}} scripts/ci/verify-post-apply.py'
+
+  fmt:
+    desc: Format Terraform and Terragrunt HCL files in-place (set CHECK=true to only verify)
+    deps: [fmt:terraform, fmt:terragrunt:hcl]
+
+  fmt:terraform:
+    desc: Format Terraform files in-place (set CHECK=true to only verify without modifying)
+    cmds:
+      - cmd: terraform fmt {{if eq .CHECK "true"}}-check -diff {{end}}-recursive .
+
+  fmt:terragrunt:hcl:
+    desc: Format Terragrunt HCL in-place (set CHECK=true to only verify without modifying)
+    cmds:
+      - cmd: |
+          if [ "{{.CHECK}}" = "true" ]; then terragrunt hcl fmt --working-dir "{{.TG_SCOPE}}" --check {{.TG_ARGS}}; else terragrunt hcl fmt --working-dir "{{.TG_SCOPE}}" {{.TG_ARGS}}; fi
+
+  validate:
+    desc: Run all non-cloud validation checks
+    deps: [validate:terraform, validate:terragrunt:hcl, validate:scp:json, lint:yaml, lint:markdown]
+
+  validate:terraform:
+    desc: Validate the entire repository by default, or only TARGET when explicitly set
+    cmds:
+      - cmd: |
+          cd "{{.TG_SCOPE}}"
+          if [ -n "{{.TARGET}}" ]; then
+            terragrunt init -- -backend=false
+            terragrunt validate --no-auto-init {{.TG_ARGS}}
+          else
+            terragrunt run --all --queue-exclude-dir . init -- -backend=false
+            terragrunt run --all --queue-exclude-dir . validate --no-auto-init {{.TG_ARGS}}
+          fi
+
+  validate:terragrunt:hcl:
+    desc: Validate Terragrunt HCL for the entire repository by default, or TARGET only when explicitly set
+    cmds:
+      - cmd: |
+          terragrunt hcl fmt --working-dir "{{.TG_SCOPE}}" --check {{.TG_ARGS}}
+
+  validate:scp:json:
+    desc: Validate all service-control-policy JSON documents
+    cmds:
+      - python -c "import json,pathlib; [json.loads(p.read_text(encoding='utf-8')) for p in pathlib.Path('policies/scp').glob('*.json')]; print('SCP JSON validation passed')"
+
+  lint:
+    desc: Run configured linters
+    deps: [lint:terraform, lint:yaml, lint:markdown, lint:shell, lint:actions]
+
+  lint:terraform:
+    desc: Run TFLint recursively
+    cmds:
+      - tflint --recursive --config "{{.ROOT_DIR}}/tooling/.tflint.hcl"
+
+  lint:actions:
+    desc: Validate GitHub Actions workflows with Actionlint
+    cmds:
+      - actionlint
+
+  lint:yaml:
+    desc: Lint YAML inventory, policies, and configuration
+    cmds:
+      - python -m yamllint -c tooling/.yamllint.yml inventory policies .github
+
+  lint:markdown:
+    desc: Lint Markdown documentation
+    cmds:
+      - markdownlint-cli2 --config ./tooling/.markdownlint-cli2.yaml "**/*.md"
+
+  lint:shell:
+    desc: Lint and auto-fix POSIX shell scripts (CHECK=true to check only)
+    cmds:
+      - shellcheck scripts/**/*.sh
+      - shfmt {{if eq .CHECK "true"}}-d{{else}}-w{{end}} scripts/**/*.sh
+
+  scan:checkov:
+    desc: Scan Terraform/Terragrunt and policy configuration with Checkov
+    cmds:
+       - >-
+         checkov
+         -d live/
+         -d policies/
+         --framework terraform secrets
+         --output cli
+         --compact
+         --skip-path .git/
+         --skip-path .github/
+         --skip-path .devcontainer/
+         --skip-path .vscode/
+         --skip-path docs/
+         --skip-path tests/
+         --skip-path scripts/bootstrap/
+         --skip-path node_modules/
+         --skip-path .terraform/
+         --skip-path .terragrunt-cache/
+         --skip-check CKV_AWS_18,CKV2_AWS_62,CKV_AWS_145,CKV2_AWS_5,CKV2_AWS_12,CKV_AWS_107,CKV_AWS_108,CKV_AWS_111,CKV2_AWS_64,CKV_AWS_153,CKV_AWS_21
+         --download-external-modules {{.CHECKOV_DOWNLOAD_EXTERNAL_MODULES | default "true"}}
+         --external-modules-download-path "{{.CHECKOV_MODULE_PATH | default ".checkov-external-modules"}}"
+         --evaluate-variables true
+         --repo-root-for-plan-enrichment .
+         --deep-analysis
+         --hard-fail-on CRITICAL,HIGH
+
+  scan:trivy:config:
+    desc: Scan infrastructure configuration with Trivy
+    cmds:
+      - trivy config --ignorefile tooling/.trivyignore --skip-dirs '**/.terraform' --skip-dirs '**/.terragrunt-cache' --severity HIGH,CRITICAL --exit-code 1 .
+
+  scan:trivy:fs:
+    desc: Scan repository dependency manifests for high and critical vulnerabilities
+    cmds:
+      - trivy fs --scanners vuln --ignorefile tooling/.trivyignore --skip-dirs '**/.terraform' --skip-dirs '**/.terragrunt-cache' --severity HIGH,CRITICAL --exit-code 1 .
+
+  scan:gitleaks:
+    desc: Scan repository history and working tree for secrets
+    cmds:
+      - gitleaks detect --no-banner --redact
+      - gitleaks dir --no-banner --redact .
+
+  security-all:
+    desc: Run all configured security scanners
+    cmds:
+      - task: scan:checkov
+      - task: scan:trivy:config
+      - task: scan:trivy:fs
+      - task: scan:gitleaks
+      - task: lint:actions
+
+  pre-commit:
+    desc: Run all pre-commit hooks against the repository
+    cmds:
+      - pre-commit run --all-files
+
+  ci:
+    desc: Execute the complete CI-equivalent validation and security suite
+    deps: [verify-env, fmt, validate, lint, security-all]
+
+  init:
+    desc: Initialize every stack under live without backend provisioning or state migration, or only TARGET when set
+    cmds:
+      - cmd: |
+          cd "{{.TG_SCOPE}}"
+          if [ -n "{{.TARGET}}" ]; then
+            terragrunt init {{.TG_ARGS}} -- -backend=false -input=false
+          else
+            terragrunt run --all --queue-exclude-dir . init {{.TG_ARGS}} -- -backend=false -input=false
+          fi
+
+  render:terragrunt:
+    desc: Render Terragrunt configuration for the entire repository by default, or only TARGET when explicitly set
+    cmds:
+      - cmd: |
+          cd "{{.TG_SCOPE}}"; if [ -n "{{.TARGET}}" ]; then terragrunt render --non-interactive {{.TG_ARGS}}; else terragrunt render --all --non-interactive --queue-exclude-dir . {{.TG_ARGS}}; fi
+
+  init-validate-plan:
+    desc: Initialize, validate, and generate an advisory plan for TARGET
+    deps: [init, validate:terraform, plan]
+
+  plan:
+    desc: Advisory plan for every stack under live, or only TARGET when set. Placeholder/credential failures pass unless STRICT=1.
+    cmds:
+      - '{{.PY}} "{{.ROOT_DIR}}/scripts/ci/plan.py" {{if .TARGET}}--dir "{{.TARGET}}"{{end}} {{if eq .STRICT "1"}}--strict{{end}}'
+
+  apply:
+    desc: Skip apply (exit 0) unless APPLY=true. Then apply every stack under live, or only TARGET when set. Placeholder/credential failures pass.
+    cmds:
+      - cmd: |
+          case "{{.APPLY}}" in
+            true|TRUE) ;;
+            *)
+              echo "apply skipped: no AWS resources will be created. Set APPLY=true to apply for real."
+              exit 0
+              ;;
+          esac
+          cd "{{.TG_SCOPE}}"
+          if [ -n "{{.TARGET}}" ]; then
+            set -- terragrunt apply {{.TG_ARGS}} -- -input=false
+          else
+            set -- terragrunt run --all --queue-exclude-dir . apply {{.TG_ARGS}} -- -input=false
+          fi
+          {{.PY}} -c "import subprocess,sys; p=subprocess.run(sys.argv[1:],text=True,capture_output=True); print(p.stdout,end=''); print(p.stderr,end='',file=sys.stderr); t=(p.stdout+p.stderr).lower(); known=any(x in t for x in ['tbd','placeholder','account id','no credentials','unable to locate credentials','could not assume role','backend configuration']); sys.exit(0 if p.returncode==0 or known else p.returncode)" "$@"
+
+  drift:
+    desc: Scan every remote-state stack in inventory order; fail on drift or operational errors
+    silent: true
+    cmds:
+      - '{{.PY}} scripts/ci/drift-ci.py'
+
+  changed-stacks:
+    desc: Emit changed Terragrunt stack paths as JSON (requires BASE_REF)
+    cmds:
+      - go run ./scripts/ci/detect-changed-stacks.go --base "{{.BASE_REF}}"
+
+  plan-matrix:
+    desc: Build a deterministic plan matrix from detector JSON (CHANGED_STACKS file, or - for stdin)
+    preconditions:
+      - sh: test -n "{{.CHANGED_STACKS}}"
+        msg: "CHANGED_STACKS is required: path to {\"stacks\":[...]} JSON, or - for stdin."
+    cmds:
+      - python "{{.ROOT_DIR}}/scripts/ci/build-plan-matrix.py" --changed-stacks "{{.CHANGED_STACKS}}" --root "{{.ROOT_DIR}}"
+
+  bootstrap:create-backend:
+    desc: Safely run the backend bootstrap helper (pass flags via CLI_ARGS)
+    cmds:
+      - python scripts/bootstrap/01-create-backend.py {{.CLI_ARGS}}
+
+  bootstrap:migrate-to-remote:
+    desc: Safely run state migration helper (pass flags via CLI_ARGS)
+    cmds:
+      - python scripts/bootstrap/02-migrate-to-remote.py {{.CLI_ARGS}}
+
+  clean:
+    desc: Remove local Terraform/Terragrunt caches and generated plans
+    cmds:
+      - python -c "import pathlib,shutil; [shutil.rmtree(p,ignore_errors=True) for p in pathlib.Path('.').rglob('.terragrunt-cache')]; [shutil.rmtree(p,ignore_errors=True) for p in pathlib.Path('.').rglob('.terraform')]; [p.unlink() for p in pathlib.Path('.').glob('*.tfplan') if p.is_file()]"

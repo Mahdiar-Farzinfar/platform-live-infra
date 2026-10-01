@@ -1,0 +1,92 @@
+# Local hooks use the repository's pinned tools and Taskfile commands.
+repos:
+  - repo: local
+    hooks:
+      - id: terraform-fmt-check
+        name: Terraform formatting (Taskfile check mode)
+        entry: task fmt:terraform CHECK=true
+        language: system
+        files: \.(?:tf|tfvars)$
+        types: [file]
+        pass_filenames: false
+
+      # The Taskfile formats live/ as a unit; its CHECK mode leaves files unchanged.
+      - id: terragrunt-hcl-fmt-check
+        name: Terragrunt HCL formatting (Taskfile check mode)
+        entry: task fmt:terragrunt:hcl CHECK=true
+        language: system
+        files: ^live/.*\.hcl$
+        exclude: (^|/)\.terraform\.lock\.hcl$
+        types: [file]
+        pass_filenames: false
+
+      # These Taskfile checks use repository-wide globs and accept no filenames.
+      - id: scp-json-validate
+        name: SCP JSON validation (Taskfile)
+        entry: task validate:scp:json
+        language: system
+        files: ^policies/scp/[^/]+\.json$
+        types: [file]
+        pass_filenames: false
+
+      - id: yaml-lint
+        name: YAML lint (Taskfile)
+        entry: task lint:yaml
+        language: system
+        files: ^(?:inventory/|policies/|\.github/).*\.ya?ml$
+        types: [file]
+        pass_filenames: false
+
+      - id: markdown-lint
+        name: Markdown lint (Taskfile)
+        entry: task lint:markdown
+        language: system
+        files: \.md$
+        types: [file]
+        pass_filenames: false
+
+      - id: pre-commit-config-validate
+        name: Validate pre-commit configuration
+        entry: pre-commit validate-config
+        language: system
+        files: ^\.pre-commit-config\.yaml$
+        types: [file]
+        pass_filenames: false
+
+      - id: shell-lint
+        name: Shell lint (Taskfile check mode)
+        entry: task lint:shell CHECK=true
+        language: system
+        stages: [pre-commit]
+        files: ^scripts/.+\.sh$
+        types: [file]
+        pass_filenames: false
+
+      - id: actions-lint
+        name: GitHub Actions lint (Taskfile)
+        entry: task lint:actions
+        language: system
+        stages: [pre-commit]
+        files: ^\.github/workflows/.+\.ya?ml$
+        types: [file]
+        pass_filenames: false
+
+      # Nearest live/**/terragrunt.hcl only. One TARGET per stack, not run --all.
+      - id: terraform-validate-changed-stacks
+        name: Terragrunt validate changed live stacks
+        entry: >-
+          bash -c 'set -euo pipefail; tmp=$(mktemp); trap "rm -f \"$tmp\"" EXIT; for f in "$@"; do d=$(dirname "$f"); while [ "$d" != "." ] && [ "$d" != "/" ] && [ ! -f "$d/terragrunt.hcl" ]; do d=$(dirname "$d"); done; case "$d" in live/*) [ -f "$d/terragrunt.hcl" ] && printf "%s\n" "$d" >> "$tmp" ;; esac; done; if [ ! -s "$tmp" ]; then echo "validate:terraform skipped: no live stack in pushed files"; exit 0; fi; sort -u "$tmp" | while IFS= read -r stack; do echo "validate:terraform TARGET=$stack"; task validate:terraform "TARGET=$stack"; done' --
+        language: system
+        stages: [pre-push]
+        files: ^live/.+\.(?:tf|tfvars|hcl)$
+        exclude: (^|/)\.terraform\.lock\.hcl$
+        types: [file]
+        pass_filenames: true
+
+      - id: security-all
+        name: Security scanners (Taskfile)
+        entry: task security-all
+        language: system
+        stages: [pre-push]
+        pass_filenames: false
+        always_run: true
