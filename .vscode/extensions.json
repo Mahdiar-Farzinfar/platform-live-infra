@@ -1,0 +1,29 @@
+{
+  "recommendations": [
+    "hashicorp.terraform",
+    "golang.go",
+    "ms-python.python",
+    "ms-python.autopep8",
+    "ms-python.flake8",
+    "timonwong.shellcheck",
+    "ms-vscode.powershell",
+    "redhat.vscode-yaml",
+    "davidanson.vscode-markdownlint",
+    "editorconfig.editorconfig",
+    "eamodio.gitlens",
+    "gruntfuggly.todo-tree",
+    "esbenp.prettier-vscode",
+    "ms-azuretools.vscode-docker",
+    "github.vscode-github-actions",
+    "streetsidesoftware.code-spell-checker",
+    "yzhang.markdown-all-in-one",
+    "tamasfe.even-better-toml",
+    "foxundermoon.shell-format",
+    "ms-vscode.makefile-tools"
+  ],
+  "unwantedRecommendations": [
+    "hookyqr.beautify",
+    "dbaeumer.jshint",
+    "ms-vscode.vscode-typescript-tslint-plugin"
+  ]
+}
