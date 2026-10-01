@@ -1,0 +1,260 @@
+{
+  "// FILE ASSOCIATIONS": "===========================",
+  "files.associations": {
+    "*.hcl": "terraform",
+    "terragrunt.hcl": "hcl",
+    "*.tfvars": "terraform",
+    "Taskfile.yml": "yaml",
+    "justfile": "makefile",
+    ".tool-versions": "properties",
+    ".terraform-version": "plaintext",
+    ".terragrunt-version": "plaintext"
+  },
+
+  "// EDITOR SETTINGS": "===========================",
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": false,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "explicit",
+    "source.organizeImports": "explicit"
+  },
+  "editor.rulers": [80, 120],
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "editor.trimAutoWhitespace": true,
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.trimFinalNewlines": true,
+  "files.eol": "\n",
+
+  "// TERRAFORM": "===========================",
+  "terraform.languageServer.enable": true,
+  "terraform.languageServer.args": ["serve"],
+  "terraform.experimentalFeatures.validateOnSave": true,
+  "terraform.experimentalFeatures.prefillRequiredFields": true,
+  "terraform.codelens.enabled": true,
+  "[terraform]": {
+    "editor.defaultFormatter": "hashicorp.terraform",
+    "editor.formatOnSave": true,
+    "editor.tabSize": 2
+  },
+  "[terraform-vars]": {
+    "editor.defaultFormatter": "hashicorp.terraform",
+    "editor.formatOnSave": true,
+    "editor.tabSize": 2
+  },
+
+  "// GO": "===========================",
+  "[go]": {
+    "editor.defaultFormatter": "golang.go",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    },
+    "editor.tabSize": 4,
+    "editor.insertSpaces": false
+  },
+  "go.useLanguageServer": true,
+  "go.lintTool": "golangci-lint",
+  "go.lintOnSave": "workspace",
+  "go.formatTool": "gofmt",
+  "go.testOnSave": false,
+  "go.coverOnSave": false,
+  "gopls": {
+    "formatting.gofumpt": true,
+    "ui.semanticTokens": true
+  },
+
+  "// PYTHON": "===========================",
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.autopep8",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    },
+    "editor.tabSize": 4
+  },
+  "python.linting.enabled": true,
+  "python.linting.pylintEnabled": false,
+  "python.linting.flake8Enabled": true,
+  "python.formatting.provider": "none",
+  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.autoImportCompletions": true,
+
+  "// SHELL": "===========================",
+  "[shellscript]": {
+    "editor.tabSize": 2
+  },
+  "shellcheck.enable": true,
+  "shellcheck.executablePath": "shellcheck",
+  "shellcheck.run": "onSave",
+  "shellformat.flag": "-i 2 -ci -sr",
+
+  "// POWERSHELL": "===========================",
+  "[powershell]": {
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "files.encoding": "utf8bom"
+  },
+  "powershell.codeFormatting.preset": "OTBS",
+  "powershell.codeFormatting.alignPropertyValuePairs": true,
+  "powershell.codeFormatting.ignoreOneLineBlock": false,
+
+  "// YAML_JSON": "===========================",
+  "[yaml]": {
+    "editor.defaultFormatter": "redhat.vscode-yaml",
+    "editor.tabSize": 2,
+    "editor.autoIndent": "advanced"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "vscode.json-language-features",
+    "editor.tabSize": 2
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "vscode.json-language-features",
+    "editor.tabSize": 2
+  },
+  "yaml.format.enable": true,
+  "yaml.validate": true,
+  "yaml.schemaStore.enable": true,
+  "yaml.schemas": {
+    "https://squidfunk.github.io/mkdocs-material/schema.json": "mkdocs.yml"
+  },
+  "yaml.customTags": [
+    "!Ref",
+    "!GetAtt",
+    "!Sub",
+    "!Join",
+    "!FindInMap",
+    "!ENV scalar",
+    "!ENV sequence",
+    "!relative scalar",
+    "tag:yaml.org,2002:python/name:material.extensions.emoji.twemoji",
+    "tag:yaml.org,2002:python/name:material.extensions.emoji.to_svg",
+    "tag:yaml.org,2002:python/name:pymdownx.superfences.fence_code_format",
+    "tag:yaml.org,2002:python/object/apply:pymdownx.slugs.slugify"
+  ],
+
+  "// MARKDOWN": "===========================",
+  "[markdown]": {
+    "editor.defaultFormatter": "DavidAnson.vscode-markdownlint",
+    "editor.wordWrap": "on",
+    "editor.quickSuggestions": {
+      "comments": "off",
+      "strings": "off",
+      "other": "off"
+    }
+  },
+
+  "// MAKEFILE": "===========================",
+  "[makefile]": {
+    "editor.insertSpaces": false,
+    "editor.tabSize": 4
+  },
+
+  "// FILE_EXCLUSIONS": "===========================",
+  "files.exclude": {
+    "**/.git": true,
+    "**/.terraform": true,
+    "**/.terragrunt-cache": true,
+    "**/node_modules": true,
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/.pytest_cache": true,
+    "**/.mypy_cache": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/*.egg-info": true
+  },
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/.terraform/**": true,
+    "**/.terragrunt-cache/**": true,
+    "**/node_modules/**": true,
+    "**/__pycache__/**": true,
+    "**/.pytest_cache/**": true
+  },
+  "search.exclude": {
+    "**/.git": true,
+    "**/.terraform": true,
+    "**/.terragrunt-cache": true,
+    "**/node_modules": true,
+    "**/__pycache__": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/*.tfstate": true,
+    "**/*.tfstate.backup": true
+  },
+
+  "// GIT": "===========================",
+  "git.ignoreLimitWarning": true,
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "git.enableSmartCommit": false,
+ "git.alwaysSignOff": true,
+
+  "// SECURITY": "===========================",
+  "security.workspace.trust.untrustedFiles": "open",
+  "security.workspace.trust.enabled": true,
+  "extensions.ignoreRecommendations": false,
+
+  "// TERMINAL": "===========================",
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "terminal.integrated.defaultProfile.osx": "zsh",
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "terminal.integrated.cwd": "${workspaceFolder}",
+  "terminal.integrated.scrollback": 10000,
+
+  "// TASKS": "===========================",
+  "task.autoDetect": "on",
+  "task.problemMatchers.neverPrompt": false,
+  "task.quickOpen.history": 10,
+
+  "// TODO_TREE": "===========================",
+  "todo-tree.tree.showScanModeButton": false,
+  "todo-tree.general.tags": [
+    "TODO",
+    "FIXME",
+    "HACK",
+    "NOTE",
+    "BUG",
+    "SECURITY"
+  ],
+  "todo-tree.highlights.defaultHighlight": {
+    "foreground": "white",
+    "type": "text"
+  },
+  "todo-tree.highlights.customHighlight": {
+    "TODO": {
+      "icon": "check",
+      "iconColour": "yellow"
+    },
+    "FIXME": {
+      "icon": "alert",
+      "iconColour": "red"
+    },
+    "SECURITY": {
+      "icon": "shield",
+      "iconColour": "red"
+    }
+  },
+
+  "// BREADCRUMBS": "===========================",
+  "breadcrumbs.enabled": true,
+  "breadcrumbs.filePath": "on",
+  "breadcrumbs.symbolPath": "on",
+
+  "// MINIMAP": "===========================",
+  "editor.minimap.enabled": true,
+  "editor.minimap.maxColumn": 120,
+  "editor.minimap.renderCharacters": false,
+
+  "// WORKSPACE": "===========================",
+  "explorer.confirmDelete": true,
+  "explorer.confirmDragAndDrop": true,
+  "explorer.sortOrder": "type",
+  "problems.autoReveal": true,
+  "workbench.editor.enablePreview": false,
+  "workbench.editor.highlightModifiedTabs": true
+}
