@@ -1,0 +1,283 @@
+# ================================================================
+# Environment variables, credentials, and secrets
+# ================================================================
+.env*
+!.env.example
+!**/.env.example
+
+# Local Terraform/Terragrunt variable files and generated inputs
+*.tfvars
+*.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json
+!*.example.tfvars
+!*.tfvars.example
+!*.auto.tfvars.example
+
+# Cloud/provider and local CLI credentials
+.aws/
+.azure/
+.config/gcloud/
+.kube/
+.terraform.d/credentials.tfrc.json
+credentials.json
+credentials.*.json
+secrets/
+secret/
+secrets.*
+*.secret
+*.secret.*
+*.token
+*.token.*
+
+# Private keys, certificates, keystores, and signing material
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.pkcs12
+*.crt
+*.cer
+*.der
+*.csr
+*.gpg
+*.asc
+*.age
+*.ovpn
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+
+# ================================================================
+# Dependencies and vendor directories
+# ================================================================
+# Go module mode is used via go.mod/go.sum; generated vendored copies
+# are not part of the repository unless deliberately force-added.
+vendor/
+
+# Python environments and package metadata
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Tool-managed dependency/cache directories
+.terraform.d/
+.terragrunt-cache/
+**/.terraform/
+**/.terragrunt-cache/
+**/.terragrunt-stack/
+
+# ================================================================
+# Terraform/Terragrunt state, plans, and local overrides
+# ================================================================
+*.tfstate
+*.tfstate.*
+terraform.tfstate.d/
+**/terraform.tfstate.d/
+crash.log
+crash.*.log
+
+*.tfplan
+*.tfplan.json
+*.plan
+plan.out
+plan.json
+
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+.terraformrc
+terraform.rc
+*.rc.local
+
+# Keep .terraform.lock.hcl files trackable: provider lockfiles are
+# required for deterministic, reviewable infrastructure builds.
+
+# ================================================================
+# Go build artifacts, tests, and profiling output
+# ================================================================
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.prof
+*.out
+coverage.out
+cover.out
+*.coverprofile
+go.work
+go.work.sum
+
+# ================================================================
+# Python caches, test output, and local tooling
+# ================================================================
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.pyre/
+.ruff_cache/
+.hypothesis/
+.tox/
+.nox/
+.coverage
+.coverage.*
+coverage/
+htmlcov/
+*.py,cover
+
+# ================================================================
+# Build artifacts, bundles, generated documentation, and binaries
+# ================================================================
+build/
+_build/
+public/
+site/
+_site/
+docs/.cache/
+docs/generated/
+generated/
+artifacts/
+releases/
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.gz
+
+# Preserve source archives that are intentionally tracked by force-adding
+# them only when they are part of a reviewed bootstrap or release process.
+
+# ================================================================
+# Logs, caches, temporary files, and runtime state
+# ================================================================
+*.log
+logs/
+tmp/
+temp/
+**/tmp/
+**/temp/
+.cache/
+**/.cache/
+.task/
+.task-cache/
+.just/
+.just-cache/
+.terraform-docs/
+.terraform-docs-cache/
+.pre-commit-cache/
+*.pid
+*.pid.lock
+*.seed
+*.session
+*.session.lock
+*.retry
+*.bak
+*.swp
+*.swo
+*~
+
+# ================================================================
+# Test coverage, reports, and linter/scanner caches
+# ================================================================
+reports/
+**/reports/
+test-results/
+test-reports/
+**/test-results/
+**/test-reports/
+checkov.report*
+trivy-report*
+tfsec-report*
+gitleaks-report*
+sarif-report*
+*.sarif
+*.junit.xml
+*.jsonl
+.tflint.d/
+**/.tflint.d/
+.terraform-test/
+**/.terraform-test/
+
+# ================================================================
+# Operating-system metadata
+# ================================================================
+.DS_Store
+.DS_Store?
+._*
+Icon?
+.Spotlight-V100
+.Trashes
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ================================================================
+# IDEs, editors, and local machine configuration
+# ================================================================
+.idea/
+.fleet/
+.vscode/*
+!.vscode/
+!.vscode/settings.json
+!.vscode/extensions.json
+.vs/
+*.iml
+*.ipr
+*.iws
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+.project
+.classpath
+.settings/
+.history/
+.editorconfig.local
+*.local
+*-local
+*-local.*
+
+# ================================================================
+# Docker and local development overrides
+# ================================================================
+.docker/
+docker-compose.override.yml
+docker-compose.*.override.yml
+.devcontainer/.cache/
+.devcontainer/.vscode-server/
+.devcontainer/*.log
+
+# ================================================================
+# Generated local inventories and tool output
+# ================================================================
+.terraform-version.local
+.terragrunt-version.local
+*.generated
+*.generated.*
+*.trace
+*.trace.json
+terraform-trace.log
+
+# ================================================================
+# OS/package-manager noise not used as repository source
+# ================================================================
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+node_modules/
+.pnpm-store/
