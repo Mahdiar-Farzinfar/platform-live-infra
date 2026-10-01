@@ -1,0 +1,38 @@
+# Trivy Ignore Policy
+#
+# This file intentionally contains no active suppressions by default.
+# Findings must not be ignored globally or permanently without a documented
+# risk-acceptance decision.
+#
+# Supported identifiers may include:
+#   - CVE-...       Vulnerability findings
+#   - GHSA-...      GitHub Security Advisory findings
+#   - AVD-AWS-...   Terraform / IaC misconfiguration findings
+#   - DS...         Secret scanning findings
+#   - GPL-...       License findings, where supported by the configured scanner
+#
+# Rules for adding an exception:
+# 1. Use the exact Trivy finding ID only.
+# 2. Never ignore by package name, provider name, severity, or wildcard.
+# 3. Add a by package name, provider name, severity, or wildcard.
+# 3. Add a the finding over suppressing it.
+# 5. Use a time-bounded exception and define an owner/review date.
+# 6. Do not suppress HIGH or CRITICAL findings without explicit security approval.
+# 7. Validate every exception against the actual scan target and file path.
+#
+# Example:
+#
+# CVE-YYYY-NNNN
+# AVD-AWS-XXXX
+#
+# The examples above are intentionally disabled and must not be uncommented
+# without a verified finding and an approved risk-acceptance record.
+#
+# Recommended review metadata for each exception:
+#   ID: <finding-id>
+#   Reason: <why remediation is temporarily not possible>
+#   Owner: <plus-or-github-handle>
+#   Tracking: <issue-or-risk-acceptance-reference>
+#   Review-by: <YYYY-MM-DD>
+#
+# No active suppressions are approved at repository bootstrap.
