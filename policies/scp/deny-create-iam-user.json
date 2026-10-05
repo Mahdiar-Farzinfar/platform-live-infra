@@ -1,0 +1,60 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyIAMUserCreation",
+      "Effect": "Deny",
+      "Action": [
+        "iam:CreateUser",
+        "iam:CreateLoginProfile"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringNotLike": {
+          "aws:PrincipalArn": [
+            "arn:aws:iam::*:role/BreakGlassAdmin",
+            "arn:aws:iam::*:role/EmergencyAccess"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "DenyIAMUserAccessKeyCreation",
+      "Effect": "Deny",
+      "Action": [
+        "iam:CreateAccessKey"
+      ],
+      "Resource": "arn:aws:iam::*:user/*",
+      "Condition": {
+        "StringNotLike": {
+          "aws:PrincipalArn": [
+            "arn:aws:iam::*:role/BreakGlassAdmin",
+            "arn:aws:iam::*:role/EmergencyAccess"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "DenyIAMUserCredentialModification",
+      "Effect": "Deny",
+      "Action": [
+        "iam:UpdateLoginProfile",
+        "iam:CreateVirtualMFADevice",
+        "iam:EnableMFADevice",
+        "iam:ResyncMFADevice"
+      ],
+      "Resource": [
+        "arn:aws:iam::*:user/*",
+        "arn:aws:iam::*:mfa/*"
+      ],
+      "Condition": {
+        "StringNotLike": {
+          "aws:PrincipalArn": [
+            "arn:aws:iam::*:role/BreakGlassAdmin",
+            "arn:aws:iam::*:role/EmergencyAccess"
+          ]
+        }
+      }
+    }
+  ]
+}
