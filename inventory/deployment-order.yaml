@@ -1,0 +1,335 @@
+# Authoritative deployment inventory for platform-live-infra.
+#
+# Stack paths are repository-relative directories containing terragrunt.hcl.
+# `depends_on` references stable stack IDs, allowing an orchestrator to perform
+# a topological sort while `phase` and `wave` preserve the approved operational
+# sequence and parallelization boundaries.
+
+version: 1
+
+repository:
+  name: platform-live-infra
+  live_root: live
+  stack_discovery:
+    include: "live/**/terragrunt.hcl"
+    exclude:
+      - live/terragrunt.hcl
+    identifier: stack_id
+
+bootstrap:
+  state_model: local_then_remote
+  scripts:
+    backend_create:
+      - scripts/bootstrap/01-create-backend.ps1
+      - scripts/bootstrap/01-create-backend.py
+      - scripts/bootstrap/01-create-backend.sh
+    state_migration:
+      - scripts/bootstrap/02-migrate-to-remote.ps1
+      - scripts/bootstrap/02-migrate-to-remote.py
+      - scripts/bootstrap/02-migrate-to-remote.sh
+  steps:
+    - id: backend-bootstrap
+      kind: terragrunt-stack
+      stack_id: backend-bootstrap
+      action: apply
+      state: local
+      notes: >-
+        Create the encrypted S3/DynamoDB backend before normal stacks. This
+        stack intentionally excludes _envcommon/remote-state.hcl.
+    - id: backend-state-migration
+      kind: operational
+      action: migrate
+      after: backend-bootstrap
+      command_family: terraform-init-migrate-state
+      state: local-to-remote
+      notes: >-
+        Run only after backend outputs are approved and backend configuration
+        is populated; migrate each stack before normal remote-state operations.
+
+phases:
+  - id: bootstrap
+    order: 10
+    purpose: state-backend
+    waves:
+      - id: bootstrap-backend
+        parallel: false
+        stacks: [backend-bootstrap]
+        gates: [backend-state-migration]
+
+  - id: management-and-archive-prerequisites
+    order: 20
+    purpose: foundation-prerequisites
+    waves:
+      - id: management-identity-and-archive-key
+        parallel: true
+        stacks:
+          - management-github-oidc
+          - log-archive-kms
+
+  - id: governance-and-archive-storage
+    order: 30
+    purpose: governance-and-centralized-storage
+    waves:
+      - id: governance-and-log-archive
+        parallel: true
+        stacks:
+          - management-scp
+          - log-archive-bucket
+
+  - id: security-services
+    order: 40
+    purpose: centralized-audit-and-detection
+    waves:
+      - id: security-services
+        parallel: true
+        stacks:
+          - security-cloudtrail
+          - security-guardduty
+
+  - id: workload-baselines
+    order: 50
+    purpose: workload-account-controls
+    waves:
+      - id: sandbox-baseline-and-identity
+        parallel: true
+        stacks:
+          - sandbox-scp-attachments
+          - sandbox-security-baseline
+          - sandbox-test-iam-roles
+
+stacks:
+  - id: backend-bootstrap
+    name: Terraform backend bootstrap
+    path: live/bootstrap/backend-bootstrap
+    scope: bootstrap
+    account: bootstrap-target
+    region: catalog-defined
+    module: backend-bootstrap
+    module_version: backend-bootstrap/v0.1.0
+    phase: bootstrap
+    wave: bootstrap-backend
+    depends_on: []
+    dependency_types: []
+    risk: critical
+    manual_approval: true
+    readiness:
+      - approved bootstrap account and region metadata
+      - customer-managed KMS key ARN
+      - valid backend bucket naming inputs
+    post_deploy_checks:
+      - verify encrypted state bucket and lock table exist
+      - verify public access is blocked and deletion protection is enabled
+      - run state migration before remote-state-backed stacks
+    notes: >-
+      The stack uses local state for its first apply. The remote-state layer
+      explicitly excludes this stack until migration is completed.
+
+  - id: management-github-oidc
+    name: Management GitHub Actions OIDC
+    path: live/foundation/management/us-east-1/github-oidc
+    scope: account-region
+    account: management
+    region: us-east-1
+    module: github-oidc
+    module_version: github-oidc/v0.1.0
+    phase: management-and-archive-prerequisites
+    wave: management-identity-and-archive-key
+    depends_on: [backend-bootstrap]
+    dependency_types: [state]
+    risk: high
+    manual_approval: true
+    readiness:
+      - remote backend migrated
+      - management account exists and provider credentials are verified
+      - approved GitHub OIDC subjects and least-privilege role policies
+    post_deploy_checks:
+      - verify OIDC provider and role trust policy
+      - verify no unintended role permissions are attached
+
+  - id: log-archive-kms
+    name: Log Archive KMS key
+    path: live/foundation/log-archive/us-east-1/kms
+    scope: account-region
+    account: log_archive
+    region: us-east-1
+    module: kms
+    module_version: kms/v0.1.0
+    phase: management-and-archive-prerequisites
+    wave: management-identity-and-archive-key
+    depends_on: [backend-bootstrap]
+    dependency_types: [state]
+    risk: critical
+    manual_approval: true
+    readiness:
+      - remote backend migrated
+      - log archive account exists and provider credentials are verified
+      - approved KMS administrators and service principals
+    post_deploy_checks:
+      - verify key rotation is enabled
+      - verify key policy lockout safety remains enabled
+
+  - id: management-scp
+    name: Management account SCP
+    path: live/foundation/management/us-east-1/scp
+    scope: organization-management
+    account: management
+    region: us-east-1
+    module: scp
+    module_version: scp/v0.1.0
+    phase: governance-and-archive-storage
+    wave: governance-and-log-archive
+    depends_on: [backend-bootstrap]
+    dependency_types: [state, security]
+    risk: critical
+    manual_approval: true
+    readiness:
+      - AWS Organizations ALL feature set enabled
+      - management-account provider context verified
+      - policy targets reviewed; unresolved target IDs remain unattached
+    post_deploy_checks:
+      - validate rendered SCP JSON and target set
+      - confirm break-glass and security-service exceptions
+      - review effective policy before widening attachments
+
+  - id: log-archive-bucket
+    name: Centralized log archive bucket
+    path: live/foundation/log-archive/us-east-1/log-archive-bucket
+    scope: account-region
+    account: log_archive
+    region: us-east-1
+    module: log-archive-bucket
+    module_version: log-archive-bucket/v0.1.0
+    phase: governance-and-archive-storage
+    wave: governance-and-log-archive
+    depends_on: [backend-bootstrap, log-archive-kms]
+    dependency_types: [state, encryption]
+    risk: critical
+    manual_approval: true
+    readiness:
+      - remote backend migrated
+      - KMS key output available
+      - Object Lock decision approved before bucket creation
+      - CloudTrail delivery principals and retention reviewed
+    post_deploy_checks:
+      - verify COMPLIANCE Object Lock and retention
+      - verify SSE-KMS, versioning, TLS-only access, and public access blocks
+      - verify bucket policy is ready for the Security-account trail
+
+  - id: security-cloudtrail
+    name: Security organization audit trail
+    path: live/foundation/security/us-east-1/cloudtrail
+    scope: account-region
+    account: security
+    region: us-east-1
+    module: cloudtrail
+    module_version: cloudtrail/v0.1.0
+    phase: security-services
+    wave: security-services
+    depends_on: [backend-bootstrap, log-archive-bucket]
+    dependency_types: [state, logging, encryption, cross-account]
+    risk: critical
+    manual_approval: true
+    readiness:
+      - Security account exists and provider credentials are verified
+      - Log Archive bucket outputs are available
+      - external bucket policy authorizes the trail ARN and prefix
+      - Security-account CloudTrail KMS policy is approved
+    post_deploy_checks:
+      - verify multi-Region logging and global service events
+      - verify log-file validation and active logging
+      - verify delivery to the Log Archive bucket and CloudWatch Logs
+
+  - id: security-guardduty
+    name: Security GuardDuty administrator configuration
+    path: live/foundation/security/us-east-1/guardduty
+    scope: account-region
+    account: security
+    region: us-east-1
+    module: guardduty
+    module_version: guardduty/v0.1.0
+    phase: security-services
+    wave: security-services
+    depends_on: [backend-bootstrap]
+    dependency_types: [state, security, operational]
+    risk: high
+    manual_approval: true
+    readiness:
+      - Security account exists and provider credentials are verified
+      - Organizations is enabled
+      - management-account delegated-administrator registration completed separately
+    post_deploy_checks:
+      - verify detector and protection features are enabled
+      - verify organization auto-enable configuration
+      - verify monitored Regions and account enrollment expectations
+    notes: >-
+      Delegated-administrator registration is an external management-account
+      operation; no separate live stack for that operation exists yet.
+
+  - id: sandbox-scp-attachments
+    name: Sandbox account SCP attachments
+    path: live/workloads/sandbox-account/us-east-1/scp-attachments
+    scope: account-region
+    account: sandbox
+    region: us-east-1
+    module: scp
+    module_version: scp/v0.1.0
+    phase: workload-baselines
+    wave: sandbox-baseline-and-identity
+    depends_on: [backend-bootstrap, management-scp]
+    dependency_types: [state, security, operational]
+    risk: critical
+    manual_approval: true
+    readiness:
+      - sandbox account ID is populated in the account catalog
+      - management-account provider context is verified
+      - SCP policy target and effective deny behavior reviewed
+    post_deploy_checks:
+      - verify only the sandbox account is targeted
+      - verify region restrictions preserve required security operations
+      - verify CloudTrail and break-glass exceptions remain usable
+
+  - id: sandbox-security-baseline
+    name: Sandbox GuardDuty security baseline
+    path: live/workloads/sandbox-account/us-east-1/security-baseline
+    scope: account-region
+    account: sandbox
+    region: us-east-1
+    module: guardduty
+    module_version: guardduty/v0.1.0
+    phase: workload-baselines
+    wave: sandbox-baseline-and-identity
+    depends_on: [backend-bootstrap, security-guardduty, security-cloudtrail]
+    dependency_types: [state, security, logging, operational]
+    risk: high
+    manual_approval: true
+    readiness:
+      - sandbox account exists and provider credentials are verified
+      - Security-account GuardDuty organization configuration is ready
+      - centralized CloudTrail foundation is active
+    post_deploy_checks:
+      - verify sandbox detector and protection features
+      - verify organization enrollment and finding cadence
+      - verify no local stack disables centralized controls
+
+  - id: sandbox-test-iam-roles
+    name: Sandbox IAM validation roles
+    path: live/workloads/sandbox-account/us-east-1/test-iam-roles
+    scope: account-region
+    account: sandbox
+    region: us-east-1
+    module: github-oidc
+    module_version: github-oidc/v0.1.0
+    phase: workload-baselines
+    wave: sandbox-baseline-and-identity
+    depends_on: [backend-bootstrap]
+    dependency_types: [state, identity]
+    risk: high
+    manual_approval: true
+    readiness:
+      - sandbox account ID is populated in the account catalog
+      - approved GitHub repository and exact OIDC subject are available
+      - role permissions reviewed for read-only validation scope
+    post_deploy_checks:
+      - verify provider and exact-subject trust policy
+      - verify no administrative or IAM-write permissions are attached
+      - verify role session duration and tags

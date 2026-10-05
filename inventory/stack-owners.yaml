@@ -1,0 +1,53 @@
+# Authoritative ownership inventory for deployable Terragrunt leaf stacks.
+#
+# Schema:
+#   version: integer schema version
+#   stacks: ordered list of repository-relative stack directories
+#     path: canonical directory containing terragrunt.hcl
+#     owners: one or more GitHub handles responsible for the stack
+#
+# Ownership follows the repository CODEOWNERS fallback. More specialized
+# owners can be added later without changing stack path identity.
+
+version: 1
+
+stacks:
+  # Bootstrap
+  - path: live/bootstrap/backend-bootstrap
+    owners:
+      - "@Mahdiar-Farzinfar"
+
+  # Management foundation
+  - path: live/foundation/management/us-east-1/github-oidc
+    owners:
+      - "@Mahdiar-Farzinfar"
+  - path: live/foundation/management/us-east-1/scp
+    owners:
+      - "@Mahdiar-Farzinfar"
+
+  # Log Archive foundation
+  - path: live/foundation/log-archive/us-east-1/kms
+    owners:
+      - "@Mahdiar-Farzinfar"
+  - path: live/foundation/log-archive/us-east-1/log-archive-bucket
+    owners:
+      - "@Mahdiar-Farzinfar"
+
+  # Security foundation
+  - path: live/foundation/security/us-east-1/cloudtrail
+    owners:
+      - "@Mahdiar-Farzinfar"
+  - path: live/foundation/security/us-east-1/guardduty
+    owners:
+      - "@Mahdiar-Farzinfar"
+
+  # Workload accounts
+  - path: live/workloads/sandbox-account/us-east-1/scp-attachments
+    owners:
+      - "@Mahdiar-Farzinfar"
+  - path: live/workloads/sandbox-account/us-east-1/security-baseline
+    owners:
+      - "@Mahdiar-Farzinfar"
+  - path: live/workloads/sandbox-account/us-east-1/test-iam-roles
+    owners:
+      - "@Mahdiar-Farzinfar"
