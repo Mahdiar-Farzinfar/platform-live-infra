@@ -579,9 +579,11 @@ jobs:
           exec gpg --batch --no-tty --pinentry-mode loopback --passphrase-fd 3 "$@" 3<"$GNUPGHOME/passphrase"
           EOF
           chmod 700 "$RUNNER_TEMP/release-gpg"
-          printf 'GNUPGHOME=%s\n' "$GNUPGHOME" >> "$GITHUB_ENV"
-          printf 'SIGNING_FINGERPRINT=%s\n' "$SIGNING_FINGERPRINT" >> "$GITHUB_ENV"
-          printf 'SIGNER_NAME=%s\nSIGNER_EMAIL=%s\n' "$SIGNER_NAME" "$SIGNER_EMAIL" >> "$GITHUB_ENV"
+          {
+            printf 'GNUPGHOME=%s\n' "$GNUPGHOME"
+            printf 'SIGNING_FINGERPRINT=%s\n' "$SIGNING_FINGERPRINT"
+            printf 'SIGNER_NAME=%s\nSIGNER_EMAIL=%s\n' "$SIGNER_NAME" "$SIGNER_EMAIL"
+          } >> "$GITHUB_ENV"
           # Keep the passphrase out of GITHUB_ENV and logs.
           printf '%s' "$SIGNING_PASSPHRASE" > "$RUNNER_TEMP/release-gnupg/passphrase"
           chmod 600 "$RUNNER_TEMP/release-gnupg/passphrase"
@@ -688,7 +690,7 @@ jobs:
           before="$(gh api "$runs" --jq '[.workflow_runs[].id] | max // 0')"
           gh workflow run devcontainer-image.yml --ref "$TAG"
           child=''
-          for attempt in {1..30}; do
+          for _ in {1..30}; do
             gh api "$runs" > "$RUNNER_TEMP/image-runs.json"
             child="$(jq -r --arg tag "$TAG" --arg sha "$GITHUB_SHA" --argjson before "$before" '
               [.workflow_runs[] | select(.id > $before and .event == "workflow_dispatch" and
