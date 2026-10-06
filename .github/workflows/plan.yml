@@ -93,10 +93,12 @@ jobs:
         env:
           SCOPE_RESULT: ${{ steps.scope.outcome }}
         run: |
-          printf '### Planning metadata\n\nInventory validation: %s.\n\n' "$SCOPE_RESULT" >> "$GITHUB_STEP_SUMMARY"
-          printf '%s\n' 'Pull-request revisions, including same-repository PRs, receive no AWS credentials or cloud plans.' >> "$GITHUB_STEP_SUMMARY"
-          printf '%s\n' \
-            'Trusted main runs plan all remote-state stacks. This metadata check is not a successful cloud plan.' >> "$GITHUB_STEP_SUMMARY"
+          {
+            printf '### Planning metadata\n\nInventory validation: %s.\n\n' "$SCOPE_RESULT"
+            printf '%s\n' 'Pull-request revisions, including same-repository PRs, receive no AWS credentials or cloud plans.'
+            printf '%s\n' \
+              'Trusted main runs plan all remote-state stacks. This metadata check is not a successful cloud plan.'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   plan:
     name: Read-only plans (trusted main)
@@ -218,7 +220,7 @@ jobs:
           PLAN_RESULT: ${{ steps.plans.outcome }}
           IDENTITY_ENABLED: ${{ steps.plan_identity.outputs.enabled }}
         run: |
-          printf '\n### Plan execution\n\nRevision: `%s`\n\nPlan task: %s.\n\n' "$GITHUB_SHA" "$PLAN_RESULT" >> "$GITHUB_STEP_SUMMARY"
+          printf '\n### Plan execution\n\nRevision: %s\n\nPlan task: %s.\n\n' "\`$GITHUB_SHA\`" "$PLAN_RESULT" >> "$GITHUB_STEP_SUMMARY"
           if [[ "$IDENTITY_ENABLED" != 'true' ]]; then
             printf '%s\n' \
               'Cloud plan steps were skipped: AWS_DRIFT_ROLE_ARN is not configured. Set this repository variable to enable planning.' \
