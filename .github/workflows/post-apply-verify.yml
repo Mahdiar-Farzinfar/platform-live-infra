@@ -1,0 +1,91 @@
+name: Post-Apply Verification
+
+# No apply workflow exists yet. An operator explicitly selects one inventory
+# stack and confirms the reviewed commit used for the preceding apply.
+on:
+  workflow_dispatch:
+    inputs:
+      stack_id:
+        description: Stack ID from inventory/deployment-order.yaml
+        required: true
+        type: string
+      applied_commit:
+        description: Full reviewed commit SHA used for the apply (must be main HEAD)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Serialize manual checks so each result remains visible. Never cancel a run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Check selected stack configuration and pending live checklist
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    defaults:
+      run:
+        shell: bash
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Require reviewed main revision
+        env:
+          APPLIED_COMMIT: ${{ inputs.applied_commit }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != 'refs/heads/main' || ! "$APPLIED_COMMIT" =~ ^[0-9a-f]{40}$ || "$APPLIED_COMMIT" != "$GITHUB_SHA" ]]; then
+            echo 'Select main at the exact reviewed commit used for the apply.' >&2
+            exit 1
+          fi
+
+      - name: Check out reviewed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Confirm checked-out revision
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+
+      - name: Read pinned tool versions
+        id: versions
+        run: |
+          set -euo pipefail
+          for tool in python task; do
+            version="$(awk -v name="$tool" '$1 == name { print $2 }' tooling/.tool-versions)"
+            [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+            printf '%s=%s\n' "$tool" "$version" >> "$GITHUB_OUTPUT"
+          done
+
+      - name: Set up pinned Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: ${{ steps.versions.outputs.python }}
+
+      - name: Set up pinned Terragrunt
+        uses: autero1/action-terragrunt@aefb0a43c4f5503a91fefb307745c4d51c26ed0e  # v3.0.2
+        with:
+          terragrunt-version-file: tooling/.terragrunt-version
+
+      - name: Set up pinned Task
+        uses: arduino/setup-task@bfe25a35f5c1f609e1d6153197b3b42a04ae054c  # v3.0.0
+        with:
+          version: ${{ steps.versions.outputs.task }}
+
+      - name: Install inventory parser from the hashed repository lockfile
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --no-input --require-hashes -r docs/requirements.txt
+
+      # The Taskfile validates the stack against inventory and invokes the
+      # existing configuration smoke task. Its summary marks live checks pending.
+      - name: Verify selected inventory scope and configured baseline
+        env:
+          STACK_ID: ${{ inputs.stack_id }}
+        run: task verify:post-apply

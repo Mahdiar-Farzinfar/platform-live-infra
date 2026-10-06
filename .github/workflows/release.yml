@@ -1,0 +1,701 @@
+name: Release
+
+# Run prepare on reviewed main, merge its changelog PR, then run publish on
+# the new main HEAD. Configure a protected release environment and tag rulesets
+# before enabling publication. Replace every action SHA placeholder first.
+on:
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: Prepare changelog PR or publish its reviewed merge
+        required: true
+        type: choice
+        options: [prepare, publish]
+      release_type:
+        description: Repository baseline/patch/breaking or Dev Container SemVer bump
+        required: true
+        type: choice
+        options: [baseline, patch, breaking, image-initial, image-major, image-minor, image-patch]
+      reviewed_commit:
+        description: Exact 40-character lowercase main HEAD SHA
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Serialize both phases and both tag namespaces. Never cancel a release run.
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Validate source and render release metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      source: ${{ steps.plan.outputs.source }}
+      kind: ${{ steps.plan.outputs.kind }}
+      branch: ${{ steps.plan.outputs.branch }}
+      image_version: ${{ steps.plan.outputs.image_version }}
+    steps:
+      - name: Check out complete reviewed history and tags
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Validate inputs, remote refs, compatibility, and changelog
+        id: plan
+        env:
+          RELEASE_PHASE: ${{ inputs.phase }}
+          RELEASE_TYPE: ${{ inputs.release_type }}
+          REVIEWED_COMMIT: ${{ inputs.reviewed_commit }}
+          APPROVAL_ENVIRONMENT: ${{ vars.RELEASE_APPROVAL_ENVIRONMENT }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import datetime as dt
+          import hashlib
+          import json
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+          from urllib.request import Request, urlopen
+
+          def fail(message):
+              raise SystemExit(message)
+
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True).strip()
+
+          def api(path):
+              request = Request(
+                  f'https://api.github.com/repos/{os.environ["GITHUB_REPOSITORY"]}{path}',
+                  headers={'Accept': 'application/vnd.github+json',
+                           'Authorization': f'Bearer {os.environ["GH_TOKEN"]}',
+                           'X-GitHub-Api-Version': '2022-11-28'},
+              )
+              with urlopen(request, timeout=30) as response:
+                  return json.load(response)
+
+          phase = os.environ['RELEASE_PHASE']
+          release_type = os.environ['RELEASE_TYPE']
+          requested = os.environ['REVIEWED_COMMIT']
+          head = git('rev-parse', 'HEAD')
+          if (phase not in ('prepare', 'publish') or
+                  release_type not in ('baseline', 'patch', 'breaking', 'image-initial',
+                                       'image-major', 'image-minor', 'image-patch') or
+                  not re.fullmatch(r'[0-9a-f]{40}', requested) or
+                  os.environ['GITHUB_REF'] != 'refs/heads/main' or
+                  os.environ['GITHUB_REF_PROTECTED'] != 'true' or
+                  requested != head or head != os.environ['GITHUB_SHA']):
+              fail('Select protected main at its exact reviewed HEAD and valid release inputs.')
+          if (api('')['default_branch'] != 'main' or
+                  api('/git/ref/heads/main')['object']['sha'] != head):
+              fail('main is not the current remote default-branch HEAD.')
+          if phase == 'publish':
+              environment = os.environ['APPROVAL_ENVIRONMENT']
+              if not re.fullmatch(r'[A-Za-z0-9_-]+', environment):
+                  fail('Configure RELEASE_APPROVAL_ENVIRONMENT before publication.')
+              protection = api(f'/environments/{environment}')['protection_rules']
+              if not any(rule['type'] == 'required_reviewers' and rule.get('reviewers')
+                         for rule in protection):
+                  fail('Release environment must already have required reviewers.')
+
+          # Compare GitHub's complete remote tag list with the checkout: never
+          # derive a version from a stale/incomplete local namespace.
+          refs = api('/git/matching-refs')
+          if len(refs) > 10000:
+              fail('Ref inventory exceeds the verified bound; inspect manually.')
+          remote = {item['ref'].removeprefix('refs/tags/') for item in refs
+                    if item['ref'].startswith('refs/tags/')}
+          local = set(git('tag', '-l').splitlines())
+          if local != remote:
+              fail('Remote and local tags differ; stop instead of guessing a version.')
+          calver = re.compile(r'v(20[0-9]{2})\.(0[1-9]|1[0-2])\.(0|[1-9][0-9]{0,3})\Z')
+          semver = re.compile(r'image/devcontainer/v(0|[1-9][0-9]{0,3})\.'
+                              r'(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})\Z')
+          repo_tags = []
+          image_tags = []
+          for name in local:
+              if name.startswith('image/devcontainer/'):
+                  match = semver.fullmatch(name)
+                  if not match:
+                      fail(f'Unknown Dev Container tag format: {name}')
+                  image_tags.append((tuple(map(int, match.groups())), name))
+              elif name.startswith('v'):
+                  match = calver.fullmatch(name)
+                  if not match:
+                      fail(f'Unknown repository tag format: {name}')
+                  repo_tags.append((tuple(map(int, match.groups())), name))
+          kind = 'image' if release_type.startswith('image-') else 'repository'
+          today = dt.datetime.now(dt.timezone.utc).date()
+          month = (today.year, today.month)
+          if kind == 'repository':
+              if any(parts[:2] > month for parts, _ in repo_tags):
+                  fail('A future calendar release tag exists; inspect the tag history.')
+              patches = sorted(parts[2] for parts, _ in repo_tags if parts[:2] == month)
+              if patches != list(range(len(patches))):
+                  fail('Monthly patches are not contiguous from zero; inspect tag history.')
+              if release_type in ('baseline', 'breaking'):
+                  if patches:
+                      fail('Monthly baseline already exists; breaking changes wait for a later month.')
+                  patch = 0
+              else:
+                  if not patches:
+                      fail('A same-month baseline is required before a patch.')
+                  patch = len(patches)
+              if patch > 9999:
+                  fail('Calendar patch exceeds the supported bound.')
+              tag = f'v{today.year:04d}.{today.month:02d}.{patch}'
+              previous = max(repo_tags)[1] if repo_tags else None
+              image_version = ''
+          else:
+              if release_type == 'image-initial':
+                  if image_tags:
+                      fail('Initial image version is only valid before the first image tag.')
+                  version = (0, 1, 0)
+              else:
+                  if not image_tags:
+                      fail('Use image-initial for the first image release (v0.1.0).')
+                  major, minor, patch = max(image_tags)[0]
+                  if release_type == 'image-major':
+                      version = (major + 1, 0, 0)
+                  elif release_type == 'image-minor':
+                      version = (major, minor + 1, 0)
+                  else:
+                      version = (major, minor, patch + 1)
+              if max(version) > 9999:
+                  fail('Image SemVer component exceeds the supported bound.')
+              image_version = 'v' + '.'.join(map(str, version))
+              tag = f'image/devcontainer/{image_version}'
+              previous = max(image_tags)[1] if image_tags else None
+          if tag in remote:
+              fail(f'Release tag {tag} already exists.')
+          if previous:
+              ref = api(f'/git/ref/tags/{previous}')
+              if ref['object']['type'] != 'tag':
+                  fail('Previous release tag is not signed and annotated.')
+              annotation = api(f'/git/tags/{ref["object"]["sha"]}')
+              if (annotation['tag'] != previous or
+                      annotation['verification']['verified'] is not True or
+                      annotation['object']['type'] != 'commit' or
+                      annotation['object']['sha'] != git('rev-parse', f'{previous}^{{}}')):
+                  fail('Previous release tag signature or target is invalid.')
+          if previous and subprocess.run(['git', 'merge-base', '--is-ancestor',
+                                          previous, head]).returncode:
+              fail('Previous release is not in main ancestry.')
+
+          current = Path('CHANGELOG.md').read_text(encoding='utf-8') if Path('CHANGELOG.md').exists() else ''
+          source = head
+          release_date = today
+          if phase == 'publish':
+              pattern = (rf'(?m)^## \[{re.escape(tag)}\] - ([0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}})\n\n'
+                         rf'<!-- release-source: ([0-9a-f]{{40}}); release-kind: {kind} -->$')
+              match = re.search(pattern, current)
+              if not match or len(re.findall(pattern, current)) != 1:
+                  fail('Reviewed changelog lacks exactly one matching release entry and source SHA.')
+              release_date = dt.date.fromisoformat(match.group(1))
+              source = match.group(2)
+              if subprocess.run(['git', 'merge-base', '--is-ancestor', source, head]).returncode:
+                  fail('Changelog source is not an ancestor of the selected main commit.')
+              changed_after = git('diff', '--name-only', source, head).splitlines()
+              if changed_after != ['CHANGELOG.md']:
+                  fail('Only the reviewed changelog may change after preparation; prepare again.')
+              if not re.search(r'(?m)^Signed-off-by: .+ <[^>\s]+@[^>\s]+>$',
+                               git('show', '-s', '--format=%B', head)):
+                  fail('Changelog merge commit lacks the required DCO sign-off.')
+              try:
+                  original = subprocess.check_output(['git', 'show', f'{source}:CHANGELOG.md'],
+                                                     text=True, stderr=subprocess.DEVNULL)
+              except subprocess.CalledProcessError:
+                  original = ''
+          else:
+              original = current
+          if previous and subprocess.run(['git', 'merge-base', '--is-ancestor',
+                                          previous, source]).returncode:
+              fail('Release source is not after the previous tag.')
+          if source == (git('rev-parse', f'{previous}^{{}}') if previous else ''):
+              fail('No changes since the previous release.')
+          commit_range = f'{previous}^{{}}..{source}' if previous else source
+          log = subprocess.check_output(['git', 'log', '--reverse', '--format=%H%x00%B%x00',
+                                         commit_range], text=True).split('\x00')
+          commits = list(zip(log[0::2], log[1::2]))
+          commits = [(sha.strip(), body.strip()) for sha, body in commits if sha.strip() and body.strip()]
+          if not commits:
+              fail('No verified commits in the release range.')
+          change_names = (git('diff', '--name-only', previous, source).splitlines() if previous else
+                          git('ls-tree', '-r', '--name-only', source).splitlines())
+          image_inputs = {'.github/workflows/devcontainer-image.yml', 'go.mod',
+                          'scripts/tools/install-tools-posix.go', 'scripts/tools/verify-env.py',
+                          'tooling/.tool-versions', 'tooling/cross-platform/asdf-tool-versions',
+                          'tooling/.terraform-version', 'tooling/.terragrunt-version'}
+          def affects_image(path):
+              return path.startswith('.devcontainer/') or path in image_inputs
+          if kind == 'image' and not any(map(affects_image, change_names)):
+              fail('No image build input changed since the previous image tag.')
+
+          sections = {title: [] for title in ('Features', 'Fixes', 'Documentation',
+                       'Security Changes', 'Operational Changes', 'Breaking Changes',
+                       'Migration Guidance', 'Dev Container Image Changes')}
+          breaking = False
+          conventional = re.compile(r'^(feat|fix|docs|style|refactor|test|chore|ci|perf|build|revert)(\([^)\n]+\))?(!)?: (.+)$')
+          for sha, body in commits:
+              if not re.search(r'(?m)^Signed-off-by: .+ <[^>\s]+@[^>\s]+>$', body):
+                  fail(f'Release commit {sha} lacks the required DCO sign-off.')
+              if kind == 'image' and not any(map(affects_image, git(
+                      'diff-tree', '--root', '--no-commit-id', '--name-only', '-r', sha).splitlines())):
+                  continue
+              lines = body.splitlines()
+              match = conventional.fullmatch(lines[0])
+              if not match:
+                  fail(f'Non-Conventional Commit in release range: {sha}')
+              ctype, scope, bang, subject = match.groups()
+              footer = re.search(r'(?ms)^BREAKING CHANGE:\s*(.*?)(?=\n[A-Za-z][A-Za-z -]+:|\Z)', body)
+              is_breaking = bool(bang or footer)
+              breaking |= is_breaking
+              item = f'- {lines[0]} (`{sha[:12]}`)'
+              if kind == 'image':
+                  section = 'Dev Container Image Changes'
+              elif (scope and 'security' in scope.lower()) or '[SECURITY]' in body:
+                  section = 'Security Changes'
+              elif ctype == 'feat':
+                  section = 'Features'
+              elif ctype in ('fix', 'revert'):
+                  section = 'Fixes'
+              elif ctype == 'docs':
+                  section = 'Documentation'
+              else:
+                  section = 'Operational Changes'
+              related_prs = api(f'/commits/{sha}/pulls')
+              pr_numbers = sorted({pr['number'] for pr in related_prs
+                                   if pr.get('merged_at') and pr['base']['ref'] == 'main'
+                                   and pr.get('merge_commit_sha') == sha})
+              if pr_numbers:
+                  item += ' (' + ', '.join(f'PR #{number}' for number in pr_numbers) + ')'
+              sections[section].append(item)
+              if is_breaking:
+                  detail = footer.group(1).strip() if footer else ''
+                  migration = re.search(r'(?ms)^Migration:\s*(.*?)(?=\n[A-Z][A-Za-z -]+:|\Z)', body)
+                  guidance = migration.group(1).strip() if migration else ''
+                  if not detail or not guidance:
+                      fail(f'Breaking commit {sha} requires BREAKING CHANGE: impact and Migration: guidance.')
+                  sections['Breaking Changes'].append(f'- {detail.replace(chr(10), " ")} (`{sha[:12]}`)')
+                  sections['Migration Guidance'].append(f'- {guidance.replace(chr(10), " ")} (`{sha[:12]}`)')
+          if kind == 'repository':
+              if breaking != (release_type == 'breaking'):
+                  fail('Breaking markers require explicit breaking baseline review; patch/baseline cannot hide them.')
+          elif breaking and (release_type == 'image-patch' or
+                             (image_tags and max(image_tags)[0][0] >= 1 and
+                              release_type != 'image-major')):
+              fail('Breaking image change needs a reviewed major bump (minor allowed before v1).')
+          if phase == 'publish' and (release_date.year, release_date.month) != month and kind == 'repository':
+              fail('Release month changed after preparation; prepare a new monthly changelog.')
+
+          title = f'## [{tag}] - {release_date.isoformat()}'
+          entry = '\n'.join([title, '', f'<!-- release-source: {source}; release-kind: {kind} -->',
+                             '', f'Compatibility: {release_type}. Review the actual diff and operational impact.',
+                             '', *(f'### {name}\n\n' + '\n'.join(items) + '\n'
+                                   for name, items in sections.items() if items)]).rstrip() + '\n'
+          if not original:
+              rendered = '# Changelog\n\n' + entry
+          elif original.startswith('# Changelog\n'):
+              tail = original[len('# Changelog\n'):]
+              separator = '\n' if tail and not tail.startswith('\n') else ''
+              rendered = '# Changelog\n\n' + entry + separator + tail
+          else:
+              fail('Existing changelog format is unknown; preserve history through manual review.')
+          if f'## [{tag}]' in original:
+              fail('Candidate tag already appears in changelog history.')
+          if phase == 'publish' and current != rendered:
+              fail('Merged changelog differs from deterministic reviewed generation.')
+
+          out = Path(os.environ['RUNNER_TEMP']) / 'release-plan'
+          out.mkdir(exist_ok=True)
+          (out / 'CHANGELOG.md').write_text(rendered, encoding='utf-8')
+          (out / 'notes.md').write_text(entry, encoding='utf-8')
+          plan = {'tag': tag, 'source': source, 'target': head, 'previous': previous,
+                  'kind': kind, 'release_type': release_type, 'changed_paths': change_names,
+                  'sha256': hashlib.sha256(rendered.encode()).hexdigest()}
+          (out / 'plan.json').write_text(json.dumps(plan, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          branch = 'release/changelog/' + tag.replace('image/devcontainer/', 'image-devcontainer-')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              for key, value in {'tag': tag, 'source': source, 'kind': kind,
+                                 'branch': branch, 'image_version': image_version}.items():
+                  print(f'{key}={value}', file=output)
+          print(f'Planned {tag} from {source}; {len(commits)} commits, {len(change_names)} paths.')
+          PY
+
+      - name: Pass deterministic changelog and metadata to the gated phase
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: release-plan-${{ github.run_id }}
+          path: ${{ runner.temp }}/release-plan/
+          if-no-files-found: error
+          retention-days: 2
+
+  prepare:
+    name: Submit changelog for review
+    if: inputs.phase == 'prepare'
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Check out reviewed main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download release plan
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: release-plan-${{ github.run_id }}
+          path: ${{ runner.temp }}/release-plan
+      # An installation token makes the PR trigger ordinary CI; GITHUB_TOKEN
+      # generated pushes do not reliably start downstream checks.
+      - name: Mint scoped pull-request installation token
+        id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
+        with:
+          client-id: ${{ vars.RELEASE_PR_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PR_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Create exactly one release changelog pull request
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          BRANCH: ${{ needs.plan.outputs.branch }}
+          TAG: ${{ needs.plan.outputs.tag }}
+          SOURCE: ${{ needs.plan.outputs.source }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$SOURCE" ]]
+          [[ -n "$GH_TOKEN" && "$BRANCH" =~ ^release/changelog/[a-zA-Z0-9./-]+$ ]]
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$BRANCH" > /dev/null 2> "$RUNNER_TEMP/ref-error"; then
+            echo 'Changelog branch already exists; inspect its PR before retrying.' >&2
+            exit 1
+          fi
+          grep -q 'HTTP 404' "$RUNNER_TEMP/ref-error" || { echo 'Cannot prove changelog branch is unused.' >&2; exit 1; }
+          cp "$RUNNER_TEMP/release-plan/CHANGELOG.md" CHANGELOG.md
+          git config user.name 'release-changelog[bot]'
+          git config user.email 'release-changelog[bot]@users.noreply.github.com'
+          git switch -c "$BRANCH"
+          git add -- CHANGELOG.md
+          git commit -s -m "docs(release): prepare $TAG changelog"
+          gh auth setup-git
+          git push origin "HEAD:refs/heads/$BRANCH"
+          cat > "$RUNNER_TEMP/release-pr.md" <<EOF
+          ## Release changelog: $TAG
+
+          Source main commit: \`$SOURCE\`. Review the actual diff since the previous release,
+          including module consumers, Terraform/Terragrunt, deployment and CI behavior,
+          configuration, operations, security controls, and documented interfaces.
+
+          - [ ] Compatibility classification matches actual effects and the selected release type.
+          - [ ] Validation, security scans, plans, and applicable smoke checks have been reviewed.
+          - [ ] Breaking impact and migration instructions are complete where applicable.
+          - [ ] The generated changelog accurately describes the changes and contains no sensitive data.
+
+          Merge only after required PR checks and review. Then run publish on the new main HEAD.
+          EOF
+          {
+            printf '\n### Changed paths since the previous release\n\n```json\n'
+            jq -c '.changed_paths' "$RUNNER_TEMP/release-plan/plan.json"
+            printf '```\n\n'
+            printf '%s\n' 'Inspect the full changes and sanitized plans; paths alone do not determine compatibility.'
+          } >> "$RUNNER_TEMP/release-pr.md"
+          gh pr create --base main --head "$BRANCH" --title "docs(release): review $TAG changelog" --body-file "$RUNNER_TEMP/release-pr.md"
+
+  publish:
+    name: Sign and publish the reviewed release
+    if: inputs.phase == 'publish'
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    # This variable must name an EXISTING environment with required reviewers.
+    # Configure its protection before dispatch; the preflight verifies it.
+    environment: ${{ vars.RELEASE_APPROVAL_ENVIRONMENT }}
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: read
+    steps:
+      - name: Check out complete reviewed main history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: true
+      - name: Download verified release metadata
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: release-plan-${{ github.run_id }}
+          path: ${{ runner.temp }}/release-plan
+      - name: Check environment, tag protection, PR review, and main CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPROVAL_ENVIRONMENT: ${{ vars.RELEASE_APPROVAL_ENVIRONMENT }}
+          TAG: ${{ needs.plan.outputs.tag }}
+          SOURCE: ${{ needs.plan.outputs.source }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == 'refs/heads/main' && "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          [[ "$APPROVAL_ENVIRONMENT" =~ ^[A-Za-z0-9_-]+$ ]] || { echo 'Configure RELEASE_APPROVAL_ENVIRONMENT.' >&2; exit 1; }
+          gh api "repos/$GITHUB_REPOSITORY/environments/$APPROVAL_ENVIRONMENT" \
+            --jq '.protection_rules | any(.type == "required_reviewers" and (.reviewers | length > 0))' | grep -qx true
+          # Active tag rulesets are readable with repository metadata access.
+          # Require update and deletion blocks. GitHub does not disclose
+          # bypass actors without administrative rights; audit these in repo
+          # settings, without granting this workflow admin permissions.
+          gh api --paginate "repos/$GITHUB_REPOSITORY/rulesets?targets=tag&per_page=100" \
+            --jq '.[] | select(.enforcement == "active") | .id' > "$RUNNER_TEMP/tag-rule-ids"
+          protected=false
+          while read -r rule_id; do
+            [[ "$rule_id" =~ ^[0-9]+$ ]] || continue
+            gh api "repos/$GITHUB_REPOSITORY/rulesets/$rule_id" > "$RUNNER_TEMP/tag-rule.json"
+            if jq -e --arg tag "$TAG" '
+              .target == "tag" and .enforcement == "active" and
+              ([.rules[].type] | index("update") != null and index("deletion") != null and index("creation") == null) and
+              ((.conditions.ref_name.exclude // []) | length == 0) and
+              ((.conditions.ref_name.include // []) | any(. == "~ALL" or . == ("refs/tags/" + $tag) or
+                (. == "refs/tags/v*" and ($tag | startswith("v"))) or
+                (. == "refs/tags/image/devcontainer/v*" and ($tag | startswith("image/devcontainer/v")))))
+            ' "$RUNNER_TEMP/tag-rule.json" > /dev/null; then protected=true; fi
+          done < "$RUNNER_TEMP/tag-rule-ids"
+          [[ "$protected" == true ]] || { echo 'Configure an active immutable tag ruleset for this namespace.' >&2; exit 1; }
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')" == "$GITHUB_SHA" ]]
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" > /dev/null 2> "$RUNNER_TEMP/tag-error"; then
+            echo 'Release tag already exists; never reuse it.' >&2
+            exit 1
+          fi
+          grep -q 'HTTP 404' "$RUNNER_TEMP/tag-error" || { echo 'Cannot prove release tag is unused.' >&2; exit 1; }
+          # The selected commit must be the merge of the changelog PR, with
+          # checked review and a documented compatibility decision.
+          gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" > "$RUNNER_TEMP/pulls.json"
+          pr="$(jq -er --arg source "$SOURCE" --arg tag "$TAG" '
+            [.[] | select(.merged_at != null and .base.ref == "main" and
+                (.title | contains($tag)) and
+                (.body | contains("Source main commit: `" + $source + "`")) and
+                (.body | contains("- [x] Compatibility classification")) and
+                (.body | contains("- [x] Breaking impact and migration")))] |
+            if length == 1 then .[0].number else error("Expected one reviewed changelog PR") end
+          ' "$RUNNER_TEMP/pulls.json")"
+          printf '%s\n' "$pr" > "$RUNNER_TEMP/changelog-pr-number"
+          gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$pr/reviews?per_page=100" > "$RUNNER_TEMP/reviews.json"
+          jq -se 'add | any(.[]; .state == "APPROVED")' "$RUNNER_TEMP/reviews.json" | grep -qx true
+          for workflow in validate.yml security-scan.yml cross-platform-test.yml plan.yml; do
+            gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs?head_sha=$GITHUB_SHA&event=push&per_page=100" \
+              > "$RUNNER_TEMP/$workflow.json"
+            jq -e --arg sha "$GITHUB_SHA" \
+              '[.workflow_runs[] | select(.head_sha == $sha and .event == "push" and .conclusion == "success")] | length > 0' \
+              "$RUNNER_TEMP/$workflow.json" > /dev/null || {
+              echo "Successful main push run required for $workflow at $GITHUB_SHA." >&2
+              exit 1
+            }
+          done
+          # The plan workflow runs real read-only cloud plans on main, and
+          # validate.yml includes the local security-baseline smoke task.
+
+      - name: Require reproducible repository release dependencies
+        if: needs.plan.outputs.kind == 'repository'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+
+          catalog = Path('live/catalogs/module-versions.hcl').read_text()
+          entries = re.findall(
+              r'(?m)^    ([a-z0-9-]+) = \{\n\s+version\s*=\s*"([^"]+)"\n\s+digest\s*=\s*"([^"]+)"',
+              catalog)
+          if not entries:
+              raise SystemExit('No verifiable module catalog entries found.')
+          modules = {}
+          for name, version, digest in entries:
+              if (name in modules or
+                  not re.fullmatch(rf'module/{re.escape(name)}/v(0|[1-9][0-9]*)\.'
+                                   r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', version) or
+                  not digest or digest == 'TBD'):
+                  raise SystemExit(f'Module {name} has an unresolved version or digest.')
+              modules[name] = {'version': version, 'digest': digest}
+          tracked = subprocess.check_output(['git', 'ls-files', '-z', '--', 'live']).decode().split('\0')
+          locks = [Path(path) for path in tracked if path.endswith('/.terraform.lock.hcl')]
+          if not locks:
+              raise SystemExit('Track reviewed Terraform provider lockfiles before releasing.')
+          providers = {}
+          for lock in locks:
+              found = re.findall(r'(?m)^provider "([^"]+)" \{\n\s*version\s*=\s*"([^"]+)"',
+                                 lock.read_text())
+              if not found:
+                  raise SystemExit(f'No pinned provider version found in {lock}.')
+              providers[lock.as_posix()] = dict(found)
+          metadata = {'modules': modules, 'providers_by_lockfile': providers}
+          target = Path(os.environ['RUNNER_TEMP']) / 'verified-dependencies.json'
+          target.write_text(json.dumps(metadata, indent=2, sort_keys=True) + '\n')
+          PY
+
+      - name: Import and verify the release signing identity
+        env:
+          SIGNING_KEY: ${{ secrets.RELEASE_GPG_PRIVATE_KEY }}
+          SIGNING_PASSPHRASE: ${{ secrets.RELEASE_GPG_PASSPHRASE }}
+          SIGNING_FINGERPRINT: ${{ vars.RELEASE_GPG_FINGERPRINT }}
+          SIGNER_NAME: ${{ vars.RELEASE_GPG_SIGNER_NAME }}
+          SIGNER_EMAIL: ${{ vars.RELEASE_GPG_SIGNER_EMAIL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          signer_name_pattern='^[A-Za-z0-9._ -]+$'
+          [[ -n "$SIGNING_KEY" && -n "$SIGNING_PASSPHRASE" && "$SIGNING_FINGERPRINT" =~ ^[0-9A-F]{40}$ &&
+             "$SIGNER_NAME" =~ $signer_name_pattern && "$SIGNER_EMAIL" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$ ]] || {
+            echo 'Configure the GPG signing key, passphrase, fingerprint and signer identity.' >&2
+            exit 1
+          }
+          mkdir -m 700 "$RUNNER_TEMP/release-gnupg"
+          export GNUPGHOME="$RUNNER_TEMP/release-gnupg"
+          printf '%s' "$SIGNING_KEY" | gpg --batch --quiet --import
+          actual="$(gpg --batch --with-colons --list-secret-keys "$SIGNING_FINGERPRINT" | awk -F: '$1 == "fpr" {print $10; exit}')"
+          [[ "$actual" == "$SIGNING_FINGERPRINT" ]] || { echo 'Signing identity fingerprint mismatch.' >&2; exit 1; }
+          # Git calls this wrapper for signing and local verification.
+          cat > "$RUNNER_TEMP/release-gpg" <<'EOF'
+          #!/usr/bin/env bash
+          exec gpg --batch --no-tty --pinentry-mode loopback --passphrase-fd 3 "$@" 3<"$GNUPGHOME/passphrase"
+          EOF
+          chmod 700 "$RUNNER_TEMP/release-gpg"
+          printf 'GNUPGHOME=%s\n' "$GNUPGHOME" >> "$GITHUB_ENV"
+          printf 'SIGNING_FINGERPRINT=%s\n' "$SIGNING_FINGERPRINT" >> "$GITHUB_ENV"
+          printf 'SIGNER_NAME=%s\nSIGNER_EMAIL=%s\n' "$SIGNER_NAME" "$SIGNER_EMAIL" >> "$GITHUB_ENV"
+          # Keep the passphrase out of GITHUB_ENV and logs.
+          printf '%s' "$SIGNING_PASSPHRASE" > "$RUNNER_TEMP/release-gnupg/passphrase"
+          chmod 600 "$RUNNER_TEMP/release-gnupg/passphrase"
+
+      - name: Sign exact commit, verify tag locally, and publish without force
+        env:
+          TAG: ${{ needs.plan.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          [[ -z "$(git tag -l "$TAG")" ]]
+          git config user.name "$SIGNER_NAME"
+          git config user.email "$SIGNER_EMAIL"
+          git -c "user.signingkey=$SIGNING_FINGERPRINT" -c "gpg.program=$RUNNER_TEMP/release-gpg" tag -s "$TAG" -m "Release $TAG" "$GITHUB_SHA"
+          git -c "gpg.program=$RUNNER_TEMP/release-gpg" tag -v "$TAG" > "$RUNNER_TEMP/tag-verification.txt" 2>&1 || {
+            echo 'Local tag signature verification failed.' >&2; exit 1;
+          }
+          [[ "$(git rev-parse "$TAG^{}")" == "$GITHUB_SHA" ]]
+          # A normal (non-force) push plus the tag ruleset must reject a race.
+          git push origin "refs/tags/$TAG:refs/tags/$TAG"
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq '.object.sha')" == "$(git rev-parse "$TAG")" ]]
+          gh api "repos/$GITHUB_REPOSITORY/git/tags/$(git rev-parse "$TAG")" --jq '.verification.verified' | grep -qx true
+
+      - name: Publish source release with reviewed notes and sanitized evidence
+        if: needs.plan.outputs.kind == 'repository'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.plan.outputs.tag }}
+          APPROVAL_ENVIRONMENT: ${{ vars.RELEASE_APPROVAL_ENVIRONMENT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          temp = Path(os.environ['RUNNER_TEMP'])
+          plan = json.loads((temp / 'release-plan/plan.json').read_text())
+          checks = {}
+          for filename in ('validate.yml', 'security-scan.yml',
+                           'cross-platform-test.yml', 'plan.yml'):
+              runs = json.loads((temp / f'{filename}.json').read_text())['workflow_runs']
+              match = next(run for run in runs if run['head_sha'] == plan['target'] and
+                           run['event'] == 'push' and run['conclusion'] == 'success')
+              checks[filename] = {'run_id': match['id'], 'url': match['html_url'],
+                                  'conclusion': match['conclusion']}
+          def digest(path):
+              return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+          plan['evidence'] = {
+              'terraform_version': Path('tooling/.terraform-version').read_text().strip(),
+              'terragrunt_version': Path('tooling/.terragrunt-version').read_text().strip(),
+              'module_catalog_sha256': digest('live/catalogs/module-versions.hcl'),
+              'provider_configuration_sha256': digest('live/_envcommon/provider.hcl'),
+              'deployment_order_sha256': digest('inventory/deployment-order.yaml'),
+              'changed_stack_paths': sorted({path.rsplit('/terragrunt.hcl', 1)[0]
+                                             for path in plan['changed_paths']
+                                             if path.startswith('live/') and
+                                             path.endswith('/terragrunt.hcl')}),
+              'validation_runs': checks,
+              'changelog_pr': int((temp / 'changelog-pr-number').read_text().strip()),
+              'release_environment': os.environ['APPROVAL_ENVIRONMENT'],
+              'deployment_approval': 'pending; release does not apply infrastructure',
+          }
+          plan['evidence'].update(json.loads((temp / 'verified-dependencies.json').read_text()))
+          (temp / 'release-manifest.json').write_text(
+              json.dumps(plan, indent=2, sort_keys=True) + '\n')
+          PY
+          gh release create "$TAG" --verify-tag --latest=false --target "$GITHUB_SHA" \
+            --title "$TAG" --notes-file "$RUNNER_TEMP/release-plan/notes.md" \
+            "$RUNNER_TEMP/release-manifest.json"
+          [[ "$(gh release view "$TAG" --json tagName --jq '.tagName')" == "$TAG" ]]
+
+      - name: Dispatch existing signed GHCR image build at the image tag
+        if: needs.plan.outputs.kind == 'image'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.plan.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'Image tag is signed and verified; a separate scoped job starts the image build.'
+
+  dispatch-image:
+    name: Start existing image publication workflow
+    if: inputs.phase == 'publish' && needs.plan.outputs.kind == 'image'
+    needs: [plan, publish]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 200
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch the verified image tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.plan.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          runs="repos/$GITHUB_REPOSITORY/actions/workflows/devcontainer-image.yml/runs?event=workflow_dispatch&per_page=100"
+          before="$(gh api "$runs" --jq '[.workflow_runs[].id] | max // 0')"
+          gh workflow run devcontainer-image.yml --ref "$TAG"
+          child=''
+          for attempt in {1..30}; do
+            gh api "$runs" > "$RUNNER_TEMP/image-runs.json"
+            child="$(jq -r --arg tag "$TAG" --arg sha "$GITHUB_SHA" --argjson before "$before" '
+              [.workflow_runs[] | select(.id > $before and .event == "workflow_dispatch" and
+                .head_branch == $tag and .head_sha == $sha)] | sort_by(.id) | last | .id // empty
+            ' "$RUNNER_TEMP/image-runs.json")"
+            [[ -z "$child" ]] || break
+            sleep 10
+          done
+          [[ "$child" =~ ^[0-9]+$ ]] || { echo 'Could not verify the image build run.' >&2; exit 1; }
+          gh run watch "$child" --exit-status --interval 20

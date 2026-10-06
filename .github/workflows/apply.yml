@@ -1,0 +1,92 @@
+name: Infrastructure Apply (safe skip)
+
+# The current Taskfile apply contract exits before Terragrunt unless APPLY=true.
+# This workflow intentionally exercises only that safe path. It is not a deploy.
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_commit:
+        description: Full reviewed main HEAD commit SHA (40 lowercase hex characters)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  revision:
+    name: Validate the reviewed main revision
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Require the reviewed main revision
+        env:
+          REVIEWED_COMMIT: ${{ inputs.reviewed_commit }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != 'refs/heads/main' || ! "$REVIEWED_COMMIT" =~ ^[0-9a-f]{40}$ || "$REVIEWED_COMMIT" != "$GITHUB_SHA" ]]; then
+            echo 'Select main at its exact reviewed HEAD commit.' >&2
+            exit 1
+          fi
+
+  safe-apply:
+    name: Run repository apply task without enabling AWS creation
+    needs: revision
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # This name matches the exact OIDC subject in the management stack.
+    # Required reviewers/protection must be configured in GitHub; repository
+    # files alone cannot establish or prove those environment rules.
+    environment: production
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out reviewed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Confirm source revision and read pinned Task version
+        id: versions
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          task_version="$(awk '$1 == "task" { print $2 }' tooling/.tool-versions)"
+          [[ "$task_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          printf 'task=%s\n' "$task_version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up pinned Task
+        uses: arduino/setup-task@bfe25a35f5c1f609e1d6153197b3b42a04ae054c  # v3.0.0
+        with:
+          version: ${{ steps.versions.outputs.task }}
+
+      - name: Run repository apply task (intentional safe skip)
+        id: apply
+        env:
+          APPLY: 'false'
+        run: task apply
+
+      - name: Report safe execution boundary
+        if: always()
+        env:
+          APPLY_RESULT: ${{ steps.apply.outcome }}
+        run: |
+          set -euo pipefail
+          case "$APPLY_RESULT" in
+            success) status='Task completed: real apply intentionally skipped because APPLY was false.' ;;
+            failure) status='Task failed unexpectedly; no successful apply is claimed.' ;;
+            *) status='Task did not run or complete; check revision, setup, or cancellation.' ;;
+          esac
+          {
+            printf '### Infrastructure apply (safe skip)\n\nRevision: `%s`\n\n%s\n\n' "$GITHUB_SHA" "$status"
+            printf '%s\n' 'No AWS credentials were supplied; this run does not confirm any deployed or verified infrastructure.'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,107 @@
+name: Cross-Platform Tests
+
+on:
+  pull_request: {}
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+# Supersede older checks for the same PR; keep each main/manual run visible.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  cross-platform:
+    name: Setup and checks (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        working-directory: .
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      GOTOOLCHAIN: local
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Read pinned Python, Task, and YAML linter versions (POSIX)
+        if: runner.os != 'Windows'
+        id: versions-posix
+        shell: bash
+        run: |
+          set -euo pipefail
+          for tool in python task yamllint; do
+            version="$(awk -v name="$tool" '$1 == name { print $2 }' tooling/.tool-versions)"
+            [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+            printf '%s=%s\n' "$tool" "$version" >> "$GITHUB_OUTPUT"
+          done
+
+      - name: Read pinned Python, Task, and YAML linter versions (Windows)
+        if: runner.os == 'Windows'
+        id: versions-windows
+        shell: pwsh
+        run: |
+          $lines = Get-Content -LiteralPath 'tooling\.tool-versions'
+          foreach ($tool in 'python', 'task', 'yamllint') {
+            $versions = @(
+              foreach ($line in $lines) {
+                if ($line -match "^$tool\s+([0-9]+\.[0-9]+\.[0-9]+)(?:\s+#.*)?\s*$") {
+                  $Matches[1]
+                }
+              }
+            )
+            if ($versions.Count -ne 1) { throw "Expected one concrete $tool pin" }
+            "$tool=$($versions[0])" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Set up pinned Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: ${{ steps.versions-posix.outputs.python || steps.versions-windows.outputs.python }}
+
+      - name: Set up pinned Go from go.mod
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      # setup.sh is checked in without the executable bit; run it through Bash.
+      - name: Run native Linux/macOS setup
+        if: runner.os != 'Windows'
+        shell: bash
+        run: bash ./scripts/cross-platform/setup.sh --verbose --non-interactive
+
+      - name: Run native Windows setup
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\scripts\cross-platform\setup.ps1 --verbose --non-interactive
+
+      - name: Test the platform's Go installer
+        run: go test ./scripts/tools
+
+      - name: Set up pinned Task
+        uses: arduino/setup-task@bfe25a35f5c1f609e1d6153197b3b42a04ae054c  # v3.0.0
+        with:
+          version: ${{ steps.versions-posix.outputs.task || steps.versions-windows.outputs.task }}
+
+      - name: Install pinned YAML linter
+        env:
+          YAMLLINT_VERSION: ${{ steps.versions-posix.outputs.yamllint || steps.versions-windows.outputs.yamllint }}
+        run: python -m pip install --disable-pip-version-check --no-input "yamllint==${{ env.YAMLLINT_VERSION }}"
+
+      - name: Validate service control policy JSON
+        run: task validate:scp:json
+
+      - name: Lint repository YAML
+        run: task lint:yaml
