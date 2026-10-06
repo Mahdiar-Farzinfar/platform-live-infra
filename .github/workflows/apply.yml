@@ -87,6 +87,6 @@ jobs:
             *) status='Task did not run or complete; check revision, setup, or cancellation.' ;;
           esac
           {
-            printf '### Infrastructure apply (safe skip)\n\nRevision: `%s`\n\n%s\n\n' "$GITHUB_SHA" "$status"
+            printf '### Infrastructure apply (safe skip)\n\nRevision: %s\n\n%s\n\n' "\`$GITHUB_SHA\`" "$status"
             printf '%s\n' 'No AWS credentials were supplied; this run does not confirm any deployed or verified infrastructure.'
           } >> "$GITHUB_STEP_SUMMARY"

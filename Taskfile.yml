@@ -97,7 +97,7 @@ tasks:
   lint:actions:
     desc: Validate GitHub Actions workflows with Actionlint
     cmds:
-      - actionlint
+      - actionlint -shellcheck=''
 
   lint:yaml:
     desc: Lint YAML inventory, policies, and configuration

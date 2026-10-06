@@ -61,6 +61,11 @@ jobs:
         with:
           terragrunt-version-file: tooling/.terragrunt-version
 
+      - name: Set up TFLint
+        uses: terraform-linters/setup-tflint@6ffdbaa3be476b3431f7275c26966ef32ff60337  # v6.3.2
+        with:
+          tflint_version: latest
+
       - name: Set up Task
         uses: arduino/setup-task@bfe25a35f5c1f609e1d6153197b3b42a04ae054c  # v3.0.0
         with:
