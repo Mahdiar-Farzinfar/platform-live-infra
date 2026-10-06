@@ -1,0 +1,232 @@
+name: Terraform Plan
+
+# No path filters: tooling, scripts, inventories, and shared HCL can affect plans.
+# PRs receive an explicit non-cloud metadata check. Cloud plans use reviewed main
+# only; this workflow does not implement the saved-plan/apply deployment policy.
+on:
+  pull_request: {}
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+# Supersede obsolete PR checks. Keep distinct main/manual workflow runs visible.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  metadata:
+    name: Planning metadata (no cloud access)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      GOTOOLCHAIN: local
+    steps:
+      - name: Require main for cloud-capable events
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" != 'pull_request' && "$GITHUB_REF" != 'refs/heads/main' ]]; then
+            echo 'Manual plans must select main; pull requests receive metadata validation only.' >&2
+            exit 1
+          fi
+
+      - name: Check out source and history for the detector
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Read pinned metadata tooling
+        id: versions
+        run: |
+          set -euo pipefail
+          for tool in python task; do
+            version="$(awk -v name="$tool" '$1 == name { print $2 }' tooling/.tool-versions)"
+            [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+            printf '%s=%s\n' "$tool" "$version" >> "$GITHUB_OUTPUT"
+          done
+
+      - name: Set up pinned Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: ${{ steps.versions.outputs.python }}
+
+      - name: Set up pinned Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Set up pinned Task
+        uses: arduino/setup-task@bfe25a35f5c1f609e1d6153197b3b42a04ae054c  # v3.0.0
+        with:
+          version: ${{ steps.versions.outputs.task }}
+
+      - name: Install the inventory parser from the hashed repository lockfile
+        run: python -m pip install --disable-pip-version-check --no-input --require-hashes -r docs/requirements.txt
+
+      - name: Validate detector selection and authoritative inventory
+        id: scope
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == 'pull_request' ]]; then
+            [[ "$BASE_REF" =~ ^[0-9a-f]{40}$ ]]
+            task --silent changed-stacks BASE_REF="$BASE_REF" > "$RUNNER_TEMP/changed-stacks.json"
+          else
+            # An empty selection still validates every live stack and the whole
+            # inventory DAG. Trusted cloud plans independently scan the full scope.
+            printf '{"stacks":[]}\n' > "$RUNNER_TEMP/changed-stacks.json"
+          fi
+          task --silent plan-matrix CHANGED_STACKS="$RUNNER_TEMP/changed-stacks.json"
+
+      - name: Explain the metadata check
+        if: always()
+        env:
+          SCOPE_RESULT: ${{ steps.scope.outcome }}
+        run: |
+          printf '### Planning metadata\n\nInventory validation: %s.\n\n' "$SCOPE_RESULT" >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' 'Pull-request revisions, including same-repository PRs, receive no AWS credentials or cloud plans.' >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' \
+            'Trusted main runs plan all remote-state stacks. This metadata check is not a successful cloud plan.' >> "$GITHUB_STEP_SUMMARY"
+
+  plan:
+    name: Read-only plans (trusted main)
+    needs: metadata
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    permissions:
+      contents: read
+      id-token: write
+    # Serialize this workflow's full scans. Do not cancel the in-progress plan.
+    # GitHub concurrency has no queue key: one newer run may wait, and an older
+    # pending run in this group is canceled. Keep the group separate from drift.
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.repository }}-cloud
+      cancel-in-progress: false
+    defaults:
+      run:
+        shell: bash
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Check out the triggering main revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Confirm source revision and read pinned tool versions
+        id: versions
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == 'refs/heads/main' && "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          for tool in python task; do
+            version="$(awk -v name="$tool" '$1 == name { print $2 }' tooling/.tool-versions)"
+            [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+            printf '%s=%s\n' "$tool" "$version" >> "$GITHUB_OUTPUT"
+          done
+          terraform_version="$(cat tooling/.terraform-version)"
+          [[ "$terraform_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          printf 'terraform=%s\n' "$terraform_version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up pinned Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: ${{ steps.versions.outputs.python }}
+
+      - name: Set up pinned Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e  # v4.0.1
+        with:
+          terraform_version: ${{ steps.versions.outputs.terraform }}
+          terraform_wrapper: false
+
+      - name: Set up pinned Terragrunt
+        uses: autero1/action-terragrunt@aefb0a43c4f5503a91fefb307745c4d51c26ed0e  # v3.0.2
+        with:
+          terragrunt-version-file: tooling/.terragrunt-version
+
+      - name: Set up pinned Task
+        uses: arduino/setup-task@bfe25a35f5c1f609e1d6153197b3b42a04ae054c  # v3.0.0
+        with:
+          version: ${{ steps.versions.outputs.task }}
+
+      - name: Install the inventory parser from the hashed repository lockfile
+        run: python -m pip install --disable-pip-version-check --no-input --require-hashes -r docs/requirements.txt
+
+      # Reuse the existing drift identity configuration. Before activation, its
+      # IAM policies/trust and per-account provider/backend routing must be
+      # reviewed against SECURITY.md. main is the only permitted OIDC subject.
+      # Existing TBD account/backend metadata must be resolved; errors are fatal.
+      - name: Check for reviewed planning identity
+        id: plan_identity
+        env:
+          AWS_DRIFT_ROLE_ARN: ${{ vars.AWS_DRIFT_ROLE_ARN }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$AWS_DRIFT_ROLE_ARN" =~ ^arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+$ ]]; then
+            echo 'AWS_DRIFT_ROLE_ARN is not configured; cloud plan steps will be skipped.' >&2
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo 'enabled=true' >> "$GITHUB_OUTPUT"
+
+      - name: Assume the read-only identity with GitHub OIDC
+        if: steps.plan_identity.outputs.enabled == 'true'
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd  # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DRIFT_ROLE_ARN }}
+          aws-region: us-east-1
+          role-session-name: plan-${{ github.run_id }}
+          mask-aws-account-id: true
+          # Intersect the role's resource-scoped permissions with read operations
+          # for the services consumed here. No state/backend writes or role
+          # chaining are permitted by this session. Additional account routing
+          # requires a separate reviewed authentication contract, not a broadening
+          # of these permissions or a fallback to the ambient account.
+          inline-session-policy: >-
+            {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Resource":"*","Action":[
+            "sts:GetCallerIdentity","s3:GetBucket*","s3:GetObject*","s3:List*",
+            "s3:GetEncryptionConfiguration","s3:GetLifecycleConfiguration","s3:GetReplicationConfiguration",
+            "s3:GetAccelerateConfiguration","s3:GetAnalyticsConfiguration","s3:GetInventoryConfiguration",
+            "s3:GetMetricsConfiguration","dynamodb:Describe*","dynamodb:GetItem",
+            "dynamodb:BatchGetItem","dynamodb:Query","dynamodb:Scan","kms:Describe*","kms:Get*",
+            "kms:List*","kms:Decrypt","iam:Get*","iam:List*","organizations:Describe*",
+            "organizations:List*","cloudtrail:Describe*","cloudtrail:Get*","cloudtrail:List*",
+            "guardduty:Get*","guardduty:List*","logs:Describe*","logs:List*","logs:Get*","logs:FilterLogEvents"]}]}
+
+      # Full inventory order is executed by the existing strict runner, without a
+      # GitHub matrix: matrix scheduling would not preserve stack execution order.
+      # Raw Terraform output/state/plans are never logged, cached, or uploaded.
+      - name: Generate strict advisory plans and sanitized results
+        id: plans
+        if: steps.plan_identity.outputs.enabled == 'true'
+        run: task plan
+
+      - name: Record the execution boundary
+        if: always()
+        env:
+          PLAN_RESULT: ${{ steps.plans.outcome }}
+          IDENTITY_ENABLED: ${{ steps.plan_identity.outputs.enabled }}
+        run: |
+          printf '\n### Plan execution\n\nRevision: `%s`\n\nPlan task: %s.\n\n' "$GITHUB_SHA" "$PLAN_RESULT" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$IDENTITY_ENABLED" != 'true' ]]; then
+            printf '%s\n' \
+              'Cloud plan steps were skipped: AWS_DRIFT_ROLE_ARN is not configured. Set this repository variable to enable planning.' \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+          printf '%s\n' \
+            'Only a successful plan task confirms completion. Setup/authentication failures and canceled runs do not produce a valid plan.' \
+            >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' \
+            'Results are advisory, have no saved-plan consumer, and do not authorize apply. No artifacts or PR comments are published.' \
+            >> "$GITHUB_STEP_SUMMARY"
