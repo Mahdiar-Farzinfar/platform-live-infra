@@ -166,7 +166,6 @@ tasks:
       - task: scan:trivy:config
       - task: scan:trivy:fs
       - task: scan:gitleaks
-      - task: lint:actions
 
   pre-commit:
     desc: Run all pre-commit hooks against the repository
