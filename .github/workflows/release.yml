@@ -115,7 +115,7 @@ jobs:
 
           # Compare GitHub's complete remote tag list with the checkout: never
           # derive a version from a stale/incomplete local namespace.
-          refs = api('/git/matching-refs')
+          refs = api('/git/matching-refs/tags/')
           if len(refs) > 10000:
               fail('Ref inventory exceeds the verified bound; inspect manually.')
           remote = {item['ref'].removeprefix('refs/tags/') for item in refs
