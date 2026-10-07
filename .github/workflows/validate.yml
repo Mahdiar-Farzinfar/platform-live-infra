@@ -31,7 +31,7 @@ jobs:
       - name: Read pinned tool versions
         id: versions
         run: |
-          for tool in python nodejs task yamllint markdownlint-cli2; do
+          for tool in python nodejs task yamllint markdownlint-cli2 actionlint; do
             version="$(awk -v name="$tool" '$1 == name { print $2 }' tooling/.tool-versions)"
             [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
             printf '%s=%s\n' "${tool//-/_}" "$version" >> "$GITHUB_OUTPUT"
@@ -70,6 +70,13 @@ jobs:
         uses: arduino/setup-task@bfe25a35f5c1f609e1d6153197b3b42a04ae054c  # v3.0.0
         with:
           version: ${{ steps.versions.outputs.task }}
+
+      - name: Set up actionlint
+        env:
+          ACTIONLINT_VERSION: ${{ steps.versions.outputs.actionlint }}
+        run: |
+          bash <(curl -fsSL "https://raw.githubusercontent.com/rhysd/actionlint/v${ACTIONLINT_VERSION}/scripts/download-actionlint.bash") "${ACTIONLINT_VERSION}"
+          sudo install -m 0755 ./actionlint /usr/local/bin/actionlint
 
       - name: Install pinned document linters
         env:
