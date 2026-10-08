@@ -1,0 +1,173 @@
+{
+  "name": "Platform Live Infrastructure",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "..",
+    "args": {
+      "TARGETARCH": "${localEnv:TARGETARCH:amd64}"
+    }
+  },
+  "remoteUser": "vscode",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached,readonly",
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.aws,target=/home/vscode/.aws,type=bind,consistency=cached",
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached,readonly"
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "hashicorp.terraform",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "redhat.vscode-yaml",
+        "DavidAnson.vscode-markdownlint",
+        "timonwong.shellcheck",
+        "foxundermoon.shell-format",
+        "tamasfe.even-better-toml",
+        "EditorConfig.EditorConfig",
+        "github.vscode-github-actions",
+        "eamodio.gitlens",
+        "ms-azuretools.vscode-docker",
+        "gruntfuggly.todo-tree",
+        "streetsidesoftware.code-spell-checker"
+      ],
+      "settings": {
+        "go.toolsManagement.autoUpdate": false,
+        "go.useLanguageServer": true,
+        "go.lintTool": "golangci-lint",
+        "go.lintOnSave": "workspace",
+        "go.vetOnSave": "workspace",
+        "go.formatTool": "goimports",
+        "go.testFlags": ["-v", "-race"],
+        "go.coverOnSave": false,
+        "go.gopath": "/home/vscode/go",
+        "go.goroot": "/usr/local/go",
+        "[go]": {
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+          },
+          "editor.defaultFormatter": "golang.go"
+        },
+        "terraform.languageServer.enable": true,
+        "terraform.validation.enable": true,
+        "terraform.format.enable": true,
+        "[terraform]": {
+          "editor.formatOnSave": true,
+          "editor.defaultFormatter": "hashicorp.terraform"
+        },
+        "[terraform-vars]": {
+          "editor.formatOnSave": true,
+          "editor.defaultFormatter": "hashicorp.terraform"
+        },
+        "python.defaultInterpreterPath": "/opt/asdf/shims/python",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": false,
+        "python.linting.flake8Enabled": true,
+        "python.formatting.provider": "black",
+        "[python]": {
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+          }
+        },
+        "yaml.schemas": {
+          "https://json.schemastore.org/github-workflow.json": ".github/workflows/*.yml",
+          "https://json.schemastore.org/github-action.json": ".github/actions/*/action.yml"
+        },
+        "yaml.format.enable": true,
+        "yaml.validate": true,
+        "[yaml]": {
+          "editor.formatOnSave": true,
+          "editor.defaultFormatter": "redhat.vscode-yaml"
+        },
+        "[json]": {
+          "editor.formatOnSave": true,
+          "editor.defaultFormatter": "vscode.json-language-features"
+        },
+        "[jsonc]": {
+          "editor.formatOnSave": true,
+          "editor.defaultFormatter": "vscode.json-language-features"
+        },
+        "[markdown]": {
+          "editor.formatOnSave": true,
+          "editor.defaultFormatter": "DavidAnson.vscode-markdownlint",
+          "editor.wordWrap": "on"
+        },
+        "shellcheck.executablePath": "/opt/asdf/shims/shellcheck",
+        "shellcheck.enable": true,
+        "shellcheck.run": "onType",
+        "[shellscript]": {
+          "editor.formatOnSave": true,
+          "editor.defaultFormatter": "foxundermoon.shell-format"
+        },
+        "files.eol": "\n",
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true,
+        "files.exclude": {
+          "**/.terraform": true,
+          "**/.terragrunt-cache": true,
+          "**/node_modules": true,
+          "**/__pycache__": true,
+          "**/*.pyc": true
+        },
+        "search.exclude": {
+          "**/.terraform": true,
+          "**/.terragrunt-cache": true,
+          "**/node_modules": true,
+          "**/__pycache__": true
+        },
+        "editor.formatOnSave": true,
+        "editor.formatOnPaste": false,
+        "editor.rulers": [80, 120],
+        "editor.tabSize": 2,
+        "editor.detectIndentation": true,
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "terminal.integrated.profiles.linux": {
+          "bash": {
+            "path": "/bin/bash",
+            "icon": "terminal-bash"
+          }
+        },
+        "terminal.integrated.env.linux": {
+          "ASDF_DATA_DIR": "/opt/asdf",
+          "ASDF_CONFIG_FILE": "/etc/asdfrc"
+        }
+      }
+    }
+  },
+  "features": {},
+  "postCreateCommand": "bash -c 'asdf reshim && go version && terraform version && python --version && node --version'",
+  "remoteEnv": {
+    "PATH": "/opt/asdf/shims:/opt/asdf/bin:/usr/local/go/bin:/home/vscode/.local/bin:${containerEnv:PATH}",
+    "GOPATH": "/home/vscode/go"
+  },
+  "containerEnv": {
+    "TZ": "UTC"
+  },
+  "forwardPorts": [],
+  "portsAttributes": {},
+  "otherPortsAttributes": {
+    "onAutoForward": "notify"
+  },
+  "updateContentCommand": "",
+  "waitFor": "postCreateCommand",
+  "shutdownAction": "stopContainer",
+  "overrideCommand": false,
+  "runArgs": [
+    "--init",
+    "--security-opt=seccomp=unconfined",
+    "--cap-add=SYS_PTRACE"
+  ],
+  "capAdd": [],
+  "securityOpt": [],
+  "privileged": false,
+  "init": true,
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "4gb",
+    "storage": "32gb"
+  }
+}
