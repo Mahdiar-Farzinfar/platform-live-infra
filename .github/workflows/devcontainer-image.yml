@@ -1,0 +1,331 @@
+name: Dev Container Image
+
+# The build context copies these files into the image; changes elsewhere do not
+# change its contents. Manual runs rebuild the reviewed main revision.
+on:
+  pull_request:
+    paths:
+      - .devcontainer/**
+      - .github/workflows/devcontainer-image.yml
+      - go.mod
+      - scripts/tools/install-tools-posix.go
+      - scripts/tools/verify-env.py
+      - tooling/.tool-versions
+      - tooling/cross-platform/asdf-tool-versions
+      - tooling/.terraform-version
+      - tooling/.terragrunt-version
+  push:
+    branches: [main]
+    tags: ['image/devcontainer/v*']
+    # GitHub does not apply path filters to tag pushes; validate them below.
+    paths:
+      - .devcontainer/**
+      - .github/workflows/devcontainer-image.yml
+      - go.mod
+      - scripts/tools/install-tools-posix.go
+      - scripts/tools/verify-env.py
+      - tooling/.tool-versions
+      - tooling/cross-platform/asdf-tool-versions
+      - tooling/.terraform-version
+      - tooling/.terragrunt-version
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  validate:
+    name: Validate image inputs (read only)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      image: ${{ steps.inputs.outputs.image }}
+      version: ${{ steps.inputs.outputs.version }}
+      run_tag: ${{ steps.inputs.outputs.run_tag }}
+      base_image: ${{ steps.inputs.outputs.base_image }}
+      asdf_version: ${{ steps.inputs.outputs.asdf_version }}
+      go_version: ${{ steps.inputs.outputs.go_version }}
+      username: ${{ steps.inputs.outputs.username }}
+      licenses: ${{ steps.inputs.outputs.licenses }}
+    steps:
+      - name: Check out source without stored credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate Dockerfile ARGs and prepare public build inputs
+        id: inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+          import shlex
+          from pathlib import Path
+
+          event = os.environ['GITHUB_EVENT_NAME']
+          ref = os.environ['GITHUB_REF']
+          if event == 'workflow_dispatch' and ref != 'refs/heads/main' and not ref.startswith('refs/tags/image/devcontainer/'):
+              raise SystemExit('Manual image publishing must select main or a signed image release tag.')
+          is_release = ref.startswith('refs/tags/')
+          image_tag = ref.removeprefix('refs/tags/image/devcontainer/') if is_release else ''
+          if is_release and not re.fullmatch(r'v(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})', image_tag):
+              raise SystemExit('Image release must use image/devcontainer/vMAJOR.MINOR.PATCH.')
+
+          expected = {
+              'BASE_IMAGE', 'VCS_REF', 'BUILD_DATE', 'VERSION', 'SOURCE_URL',
+              'LICENSES', 'TARGETARCH', 'ASDF_VERSION', 'GO_VERSION', 'USERNAME',
+          }
+          args = {}
+          for line in Path('.devcontainer/Dockerfile').read_text().splitlines():
+              if not re.match(r'^\s*ARG\s', line):
+                  continue
+              words = shlex.split(line, comments=True)
+              if len(words) != 2 or '=' not in words[1] and words[1] != 'TARGETARCH':
+                  raise SystemExit(f'Unsupported Dockerfile ARG declaration: {line}')
+              name, _, default = words[1].partition('=')
+              if name in args or not re.fullmatch(r'[A-Z_]+', name):
+                  raise SystemExit(f'Duplicate or invalid Dockerfile ARG: {name}')
+              args[name] = default
+          if set(args) != expected:
+              missing = sorted(expected - args.keys())
+              extra = sorted(args.keys() - expected)
+              raise SystemExit(f'Dockerfile ARG contract changed; missing={missing}, extra={extra}. Update this workflow.')
+          if args['TARGETARCH'] or any(not value for name, value in args.items() if name != 'TARGETARCH'):
+              raise SystemExit('Expected Dockerfile defaults for every ARG except BuildKit TARGETARCH.')
+          if not re.fullmatch(r'mcr\.microsoft\.com/devcontainers/base:[^@\s]+@sha256:[0-9a-f]{64}', args['BASE_IMAGE']):
+              raise SystemExit('BASE_IMAGE must use a pinned Dev Container base image digest.')
+          for name in ('ASDF_VERSION', 'GO_VERSION'):
+              if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', args[name]):
+                  raise SystemExit(f'{name} must be a pinned release version.')
+          if not re.fullmatch(r'[a-z_][a-z0-9_-]*', args['USERNAME']):
+              raise SystemExit('USERNAME must be a valid non-root account name.')
+          if not re.fullmatch(r'[A-Za-z0-9.+-]+', args['LICENSES']):
+              raise SystemExit('LICENSES must be an OCI-compatible license identifier.')
+
+          go_mod = re.findall(r'^go\s+(\S+)\s*$', Path('go.mod').read_text(), re.M)
+          tool_versions = re.findall(r'^golang\s+(\S+)\s*$', Path('tooling/.tool-versions').read_text(), re.M)
+          if go_mod != [args['GO_VERSION']] or tool_versions != go_mod:
+              raise SystemExit('GO_VERSION must match the single go.mod and tooling/.tool-versions Go pins.')
+
+          repository = os.environ['GITHUB_REPOSITORY']
+          sha = os.environ['GITHUB_SHA']
+          run_id = os.environ['GITHUB_RUN_ID']
+          attempt = os.environ['GITHUB_RUN_ATTEMPT']
+          if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', repository):
+              raise SystemExit('Invalid GitHub repository name for GHCR.')
+          if not re.fullmatch(r'[0-9a-f]{40}', sha) or not run_id.isdecimal() or not attempt.isdecimal():
+              raise SystemExit('Invalid GitHub revision or run number.')
+
+          values = {
+              'image': f'ghcr.io/{repository.lower()}/devcontainer',
+              'version': image_tag if is_release else f'sha-{sha}-{run_id}-{attempt}',
+              'run_tag': f'sha-{sha}-{run_id}-{attempt}',
+              'base_image': args['BASE_IMAGE'],
+              'asdf_version': args['ASDF_VERSION'],
+              'go_version': args['GO_VERSION'],
+              'username': args['USERNAME'],
+              'licenses': args['LICENSES'],
+          }
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              for key, value in values.items():
+                  print(f'{key}={value}', file=output)
+          PY
+
+      - name: Require a verified signed release tag on main
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          from urllib.request import Request, urlopen
+
+          tag = os.environ['GITHUB_REF'].removeprefix('refs/tags/')
+          repository = os.environ['GITHUB_REPOSITORY']
+          if not re.fullmatch(r'image/devcontainer/v(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})', tag):
+              raise SystemExit('Invalid image SemVer release tag.')
+          if os.environ.get('GITHUB_REF_PROTECTED') != 'true':
+              raise SystemExit('Protect release tags with a GitHub ruleset before publishing.')
+
+          def github(path):
+              request = Request(
+                  f'https://api.github.com/repos/{repository}{path}',
+                  headers={
+                      'Accept': 'application/vnd.github+json',
+                      'Authorization': f'Bearer {os.environ["GH_TOKEN"]}',
+                      'X-GitHub-Api-Version': '2022-11-28',
+                  },
+              )
+              with urlopen(request, timeout=30) as response:
+                  return json.load(response)
+
+          ref = github(f'/git/ref/tags/{tag}')
+          if ref['object']['type'] != 'tag':
+              raise SystemExit('Release tag must be an annotated signed tag.')
+          annotated = github(f'/git/tags/{ref["object"]["sha"]}')
+          commit = annotated['object']
+          if (annotated['tag'] != tag or annotated['verification']['verified'] is not True or
+                  commit['type'] != 'commit' or commit['sha'] != os.environ['GITHUB_SHA']):
+              raise SystemExit('Release tag signature or checked-out commit is invalid.')
+          comparison = github(f'/compare/{commit["sha"]}...main')
+          if comparison['status'] not in ('ahead', 'identical'):
+              raise SystemExit('Release tag must point to a commit already on main.')
+          PY
+
+  publish:
+    name: Build, publish, sign, and verify the multi-platform image
+    needs: validate
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' &&
+       (github.ref == 'refs/heads/main' ||
+        startsWith(github.ref, 'refs/tags/image/devcontainer/')))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    env:
+      IMAGE: ${{ needs.validate.outputs.image }}
+      VERSION: ${{ needs.validate.outputs.version }}
+      RUN_TAG: ${{ needs.validate.outputs.run_tag }}
+    steps:
+      - name: Check out the reviewed revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Use the source commit timestamp for the OCI created label
+        id: date
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          printf 'created=%s\n' "$(git show -s --format=%cI HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up arm64 emulation
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1  # v4.4.0
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image tags and OCI labels
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302  # v6.2.0
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: latest=false
+          tags: |
+            type=raw,value=${{ env.RUN_TAG }},priority=300
+          labels: |
+            org.opencontainers.image.created=${{ steps.date.outputs.created }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ env.VERSION }}
+
+      - name: Build and push the multi-platform index
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
+        with:
+          context: .
+          file: ./.devcontainer/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # TARGETARCH is BuildKit's automatic per-platform ARG; overriding it here would break arm64.
+          build-args: |
+            BASE_IMAGE=${{ needs.validate.outputs.base_image }}
+            VCS_REF=${{ github.sha }}
+            BUILD_DATE=${{ steps.date.outputs.created }}
+            VERSION=${{ env.VERSION }}
+            SOURCE_URL=https://github.com/${{ github.repository }}
+            LICENSES=${{ needs.validate.outputs.licenses }}
+            ASDF_VERSION=${{ needs.validate.outputs.asdf_version }}
+            GO_VERSION=${{ needs.validate.outputs.go_version }}
+            USERNAME=${{ needs.validate.outputs.username }}
+          cache-from: type=gha,scope=devcontainer
+          cache-to: type=gha,scope=devcontainer,mode=max
+          provenance: mode=max
+          sbom: true
+
+      - name: Resolve and validate the published index digest
+        id: manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect "$IMAGE:$RUN_TAG" --format '{{json .Manifest}}' > "$RUNNER_TEMP/devcontainer-manifest.json"
+          jq -e '
+            (.mediaType == "application/vnd.oci.image.index.v1+json" or
+             .mediaType == "application/vnd.docker.distribution.manifest.list.v2+json") and
+            (([.manifests[] | select(.platform.os == "linux") | .platform.architecture] | unique) == ["amd64", "arm64"])
+          ' "$RUNNER_TEMP/devcontainer-manifest.json" > /dev/null
+          digest="$(jq -er '.digest | select(test("^sha256:[0-9a-f]{64}$"))' "$RUNNER_TEMP/devcontainer-manifest.json")"
+          printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6  # v4.1.2
+
+      - name: Sign and verify the exact published index
+        env:
+          DIGEST: ${{ steps.manifest.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/devcontainer-image.yml@${GITHUB_REF}"
+          cosign sign --yes "$IMAGE@$DIGEST"
+          cosign verify \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+            "$IMAGE@$DIGEST" > "$RUNNER_TEMP/devcontainer-cosign-verification.json"
+
+      - name: Publish signed SemVer image tag if unused
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          DIGEST: ${{ steps.manifest.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if docker buildx imagetools inspect "$IMAGE:$VERSION" > /dev/null 2> "$RUNNER_TEMP/release-tag-lookup-error"; then
+            echo "Release image tag $VERSION already exists; refusing to overwrite it." >&2
+            exit 1
+          fi
+          if ! grep -Eiq 'not found|manifest unknown|404' "$RUNNER_TEMP/release-tag-lookup-error"; then
+            echo 'Cannot establish that the release image tag is unused.' >&2
+            exit 1
+          fi
+          docker buildx imagetools create --tag "$IMAGE:$VERSION" "$IMAGE@$DIGEST"
+
+      - name: Confirm all published tags still reference the signed index
+        env:
+          DIGEST: ${{ steps.manifest.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tags=("$RUN_TAG")
+          if [[ "$GITHUB_REF" == refs/tags/image/devcontainer/* ]]; then tags+=("$VERSION"); fi
+          for tag in "${tags[@]}"; do
+            actual="$(docker buildx imagetools inspect "$IMAGE:$tag" --format '{{json .Manifest}}' | jq -er '.digest')"
+            [[ "$actual" == "$DIGEST" ]] || { echo "Image tag $tag no longer references the signed index." >&2; exit 1; }
+          done
