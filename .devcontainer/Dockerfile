@@ -67,7 +67,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         pkg-config \
         python3 \
         python3-dev \
-        python3-pip \
         python3-venv \
         rsync \
         shellcheck \
@@ -76,6 +75,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         unzip \
         xz-utils \
         zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    apt-get update \
+    && apt-get install -y --no-install-recommends pipx \
     && rm -rf /var/lib/apt/lists/*
 
 # asdf publishes binaries for both requested architectures. Verify the
@@ -87,14 +91,15 @@ RUN set -euo pipefail \
     && curl --fail --silent --show-error --location --retry 3 \
          "${base_url}/${archive}" --output "/tmp/${archive}" \
     && curl --fail --silent --show-error --location --retry 3 \
-         "${base_url}/asdf-v${ASDF_VERSION}-checksums.txt" --output /tmp/asdf-checksums.txt \
-    && digest="$(awk -v name="${archive}" '$2 == name { print $1; exit }' /tmp/asdf-checksums.txt)" \
+         "${base_url}/${archive}.md5" --output /tmp/asdf.md5 \
+    && digest="$(tr -d '[:space:]' < /tmp/asdf.md5)" \
+    && [[ "${digest}" =~ ^[0-9a-fA-F]{32}$ ]] \
     && test -n "${digest}" \
-    && echo "${digest}  /tmp/${archive}" | sha256sum --check --status \
+    && echo "${digest}  /tmp/${archive}" | md5sum --check --status \
     && tar -xzf "/tmp/${archive}" -C /tmp \
     && install -m 0755 /tmp/asdf /usr/local/bin/asdf \
     && asdf version \
-    && rm -f "/tmp/${archive}" /tmp/asdf /tmp/asdf-checksums.txt
+    && rm -f "/tmp/${archive}" /tmp/asdf /tmp/asdf.md5
 
 # Bootstrap the exact Go compiler required by go.mod. The checksum is selected
 # from the official Go release manifest for the pinned version and target
@@ -124,32 +129,42 @@ RUN mkdir -p "${ASDF_DATA_DIR}/shims" "${ASDF_DATA_DIR}/downloads" /opt/mise \
 RUN set -euo pipefail \
     && for spec in \
          'terraform|https://github.com/asdf-community/asdf-hashicorp.git' \
-         'terragrunt|https://github.com/lotas/asdf-terragrunt.git' \
+         'terragrunt|https://github.com/gruntwork-io/asdf-terragrunt.git' \
          'golang|https://github.com/asdf-community/asdf-golang.git' \
          'python|https://github.com/asdf-community/asdf-python.git' \
          'nodejs|https://github.com/asdf-vm/asdf-nodejs.git' \
-         'awscli|https://github.com/asdf-community/asdf-awscli.git' \
-         'docker|https://github.com/asdf-community/asdf-docker.git' \
-         'tflint|https://github.com/yuuki0000/asdf-tflint.git' \
-         'trivy|https://github.com/zufallsheld/asdf-trivy.git' \
-         'checkov|https://github.com/amrox/asdf-checkov.git' \
-         'yamllint|https://github.com/luizm/asdf-yamllint.git' \
+         'awscli|https://github.com/MetricMike/asdf-awscli.git' \
+         'tflint|https://github.com/skyzyx/asdf-tflint.git' \
+         'trivy|https://github.com/zufardhiyaulhaq/asdf-trivy.git' \
+         'checkov|https://github.com/bosmak/asdf-checkov.git' \
+         'yamllint|https://github.com/ericcornelissen/asdf-yamllint.git' \
          'shellcheck|https://github.com/luizm/asdf-shellcheck.git' \
          'shfmt|https://github.com/luizm/asdf-shfmt.git' \
-         'markdownlint-cli2|https://github.com/aeons/asdf-markdownlint-cli2.git' \
-         'gitleaks|https://github.com/jimmidyson/asdf-gitleaks.git' \
-         'actionlint|https://github.com/craigfurman/asdf-actionlint.git' \
-         'golangci-lint|https://github.com/techinpark/asdf-golangci-lint.git' \
+         'markdownlint-cli2|https://github.com/paulo-ferraz-oliveira/asdf-markdownlint-cli2.git' \
+         'gitleaks|https://github.com/jmcvetta/asdf-gitleaks.git' \
+         'actionlint|https://github.com/crazy-matt/asdf-actionlint.git' \
+         'golangci-lint|https://github.com/hypnoglow/asdf-golangci-lint.git' \
          'task|https://github.com/particledecay/asdf-task.git' \
          'just|https://github.com/olofvndrhr/asdf-just.git' \
          'pre-commit|https://github.com/jonathanmorley/asdf-pre-commit.git' \
-         'jq|https://github.com/azukiapp/asdf-jq.git' \
+         'jq|https://github.com/lsanwick/asdf-jq.git' \
          'yq|https://github.com/sudermanjr/asdf-yq.git' \
-         'make|https://github.com/asdf-community/asdf-make.git' \
-         'terraform-docs|https://github.com/looztra/asdf-terraform-docs.git'; do \
+         'make|https://github.com/yacchi/asdf-make.git' \
+       ; do \
          IFS='|' read -r name url <<< "${spec}"; \
-         asdf plugin add "${name}" "${url}"; \
+         printf '[asdf] START plugin=%s url=%s\n' "${name}" "${url}" >&2; \
+         if asdf plugin add "${name}" "${url}"; then \
+           printf '[asdf] OK plugin=%s\n' "${name}" >&2; \
+         else \
+           status=$?; \
+           printf '[asdf] FAILED plugin=%s url=%s exit_code=%s\n' "${name}" "${url}" "${status}" >&2; \
+           exit "${status}"; \
+         fi; \
        done
+
+# Pre-warm shims so installer can locate all asdf-managed tools
+RUN asdf reshim \
+    && echo 'export PATH=/opt/asdf/shims:/opt/asdf/bin:$PATH' >> /etc/profile.d/10-platform-live-infra.sh
 
 # Copy only authoritative inputs needed by the installer.
 COPY go.mod /opt/platform-live-infra/go.mod
@@ -162,9 +177,24 @@ COPY scripts/tools/verify-env.py /opt/platform-live-infra/scripts/tools/verify-e
 
 WORKDIR /opt/platform-live-infra
 
+ARG DOCKER_CLI_VERSION=29.6.1
+RUN set -euo pipefail \
+    && case "${TARGETARCH}" in \
+         amd64) _arch="x86_64" ;; \
+         arm64) _arch="aarch64" ;; \
+         *) echo "unsupported arch: ${TARGETARCH}" >&2; exit 1 ;; \
+       esac \
+    && curl --fail --silent --show-error --location --retry 3 \
+         "https://download.docker.com/linux/static/stable/${_arch}/docker-${DOCKER_CLI_VERSION}.tgz" \
+         --output /tmp/docker.tgz \
+    && tar -xzf /tmp/docker.tgz --strip-components=1 -C /usr/local/bin docker/docker \
+    && rm /tmp/docker.tgz \
+    && docker --version
+
 # Compile and execute the repository-supported installer from the repository
 # root. It validates the canonical/mirror inventories and Go contract itself.
 RUN set -euo pipefail \
+    && export PATH=/opt/asdf/shims:/opt/asdf/bin:/usr/local/go/bin:${PATH} \
     && go build -trimpath -ldflags="-s -w" \
          -o /tmp/install-tools ./scripts/tools/install-tools-posix.go \
     && CI=1 /tmp/install-tools \
