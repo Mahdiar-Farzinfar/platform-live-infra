@@ -92,13 +92,13 @@ var toolSpecs = map[string]toolSpec{
 	"golang":            {Name: "golang", Executables: []string{"go"}, VersionArgs: []string{"version"}, AsdfPlugin: "golang", BrewFormula: "go", AptPackage: "golang", DNFPackage: "golang", PatchTolerance: 9},
 	"python":            {Name: "python", Executables: []string{"python3", "python"}, VersionArgs: []string{"--version"}, AsdfPlugin: "python", BrewFormula: "python", AptPackage: "python3", DNFPackage: "python3"},
 	"nodejs":            {Name: "nodejs", Executables: []string{"node"}, VersionArgs: []string{"--version"}, AsdfPlugin: "nodejs", BrewFormula: "node", AptPackage: "nodejs", DNFPackage: "nodejs"},
-	"awscli":            {Name: "awscli", Executables: []string{"aws"}, VersionArgs: []string{"--version"}, AsdfPlugin: "awscli", BrewFormula: "awscli"},
-	"docker-cli":        {Name: "docker-cli", Executables: []string{"docker"}, VersionArgs: []string{"--version"}, AsdfPlugin: "", BrewFormula: "docker"},
+	"awscli":            {Name: "awscli", Executables: []string{"aws"}, VersionArgs: []string{"--version"}, AsdfPlugin: "awscli", BrewFormula: "awscli", AptPackage: "awscli", DNFPackage: "awscli"},
+	"docker-cli":        {Name: "docker-cli", Executables: []string{"docker"}, VersionArgs: []string{"--version"}, AsdfPlugin: "docker", BrewFormula: "docker", AptPackage: "docker.io", DNFPackage: "docker"},
 	"tflint":            {Name: "tflint", Executables: []string{"tflint"}, VersionArgs: []string{"--version"}, AsdfPlugin: "tflint", BrewFormula: "tflint"},
 	"trivy":             {Name: "trivy", Executables: []string{"trivy"}, VersionArgs: []string{"--version"}, AsdfPlugin: "trivy", BrewFormula: "trivy"},
 	"checkov":           {Name: "checkov", Executables: []string{"checkov"}, VersionArgs: []string{"--version"}, AsdfPlugin: "checkov", BrewFormula: "checkov"},
 	"yamllint":          {Name: "yamllint", Executables: []string{"yamllint"}, VersionArgs: []string{"--version"}, AsdfPlugin: "yamllint", BrewFormula: "yamllint"},
-	"shellcheck":        {Name: "shellcheck", Executables: []string{"shellcheck"}, VersionArgs: []string{"--version"}, AsdfPlugin: "shellcheck", BrewFormula: "shellcheck"},
+	"shellcheck":        {Name: "shellcheck", Executables: []string{"shellcheck"}, VersionArgs: []string{"--version"}, AsdfPlugin: "shellcheck", BrewFormula: "shellcheck", AptPackage: "shellcheck", DNFPackage: "ShellCheck"},
 	"shfmt":             {Name: "shfmt", Executables: []string{"shfmt"}, VersionArgs: []string{"--version"}, AsdfPlugin: "shfmt", BrewFormula: "shfmt"},
 	"markdownlint-cli2": {Name: "markdownlint-cli2", Executables: []string{"markdownlint-cli2"}, VersionArgs: []string{"--version"}, AsdfPlugin: "markdownlint-cli2", BrewFormula: "markdownlint-cli2"},
 	"gitleaks":          {Name: "gitleaks", Executables: []string{"gitleaks"}, VersionArgs: []string{"version"}, AsdfPlugin: "gitleaks", BrewFormula: "gitleaks"},
@@ -382,170 +382,34 @@ func repairPipToolPath(ctx context.Context, runner func(context.Context, string,
 func installPipTool(ctx context.Context, cfg config, toolName, requested string) error {
 	pkg := toolName + "==" + requested
 	if cfg.DryRun {
-		fmt.Printf("dry-run: would run pipx install %s or pip install --break-system-packages %s\n", pkg, pkg)
+		fmt.Printf("dry-run: would run python -m pip install --user %s\n", pkg)
 		return nil
 	}
 	runner := cfg.Runner
 	if runner == nil {
 		runner = commandRunner
 	}
-	// Prefer pipx which is safe on externally-managed Debian/Ubuntu environments.
-	if _, err := exec.LookPath("pipx"); err == nil {
-		if _, err := runner(ctx, "pipx", "install", "--force", pkg); err != nil {
-			return fmt.Errorf("pipx install %s: %w", pkg, err)
-		}
-		repairPipToolPath(ctx, runner)
-		return nil
-	}
-	// Fallback: pip with --break-system-packages for containerised build environments
-	// where the risk of breaking the host Python installation is acceptable.
 	for _, py := range []string{"python3", "python"} {
 		if _, err := exec.LookPath(py); err != nil {
 			continue
 		}
-		if _, err := runner(ctx, py, "-m", "pip", "install",
-			"--break-system-packages", pkg); err != nil {
-			return fmt.Errorf("pip install --break-system-packages %s: %w", pkg, err)
+		if _, err := runner(ctx, py, "-m", "pip", "install", "--user", pkg); err != nil {
+			return fmt.Errorf("pip install --user %s: %w", pkg, err)
 		}
 		repairPipToolPath(ctx, runner)
 		return nil
 	}
-	return fmt.Errorf("no Python interpreter (pipx or pip) found; cannot install %s", toolName)
+	return fmt.Errorf("no Python interpreter found; cannot install %s via pip", toolName)
 }
 
 func installYamllint(ctx context.Context, cfg config, requested string) error {
 	return installPipTool(ctx, cfg, "yamllint", requested)
 }
 
-func installAwscli(ctx context.Context, cfg config, requested string) error {
-	if cfg.DryRun {
-		fmt.Printf("dry-run: would install awscli %s from official installer\n", requested)
-		return nil
-	}
-	runner := cfg.Runner
-	if runner == nil {
-		runner = commandRunner
-	}
-	arch := "x86_64"
-	if runtime.GOARCH == "arm64" {
-		arch = "aarch64"
-	}
-	url := fmt.Sprintf(
-		"https://awscli.amazonaws.com/awscli-exe-linux-%s-%s.zip",
-		arch, requested,
-	)
-	tmpDir, err := os.MkdirTemp("", "awscli-*")
-	if err != nil {
-		return fmt.Errorf("create temp dir for awscli: %w", err)
-	}
-	defer os.RemoveAll(tmpDir)
-	zipPath := filepath.Join(tmpDir, "awscliv2.zip")
-	if _, err := runner(ctx, "curl", "--fail", "--silent", "--show-error",
-		"--location", "--retry", "3", url, "--output", zipPath); err != nil {
-		return fmt.Errorf("download awscli %s: %w", requested, err)
-	}
-	if _, err := runner(ctx, "unzip", "-q", zipPath, "-d", tmpDir); err != nil {
-		return fmt.Errorf("unzip awscli: %w", err)
-	}
-	installer := filepath.Join(tmpDir, "aws", "install")
-	if os.Geteuid() == 0 {
-		if _, err := runner(ctx, installer, "--update"); err != nil {
-			return fmt.Errorf("aws install: %w", err)
-		}
-		return nil
-	}
-	if _, err := exec.LookPath("sudo"); err != nil {
-		return errors.New("awscli installation requires root or sudo")
-	}
-	if _, err := runner(ctx, "sudo", "-n", installer, "--update"); err != nil {
-		return fmt.Errorf("sudo aws install: %w", err)
-	}
-	return nil
-}
-
-func installCheckov(ctx context.Context, cfg config, requested string) error {
-	return installPipTool(ctx, cfg, "checkov", requested)
-}
-
-func installMarkdownlintCli2(ctx context.Context, cfg config, requested string) error {
-	pkg := "markdownlint-cli2@" + requested
-	if cfg.DryRun {
-		fmt.Printf("dry-run: would run npm install --global %s\n", pkg)
-		return nil
-	}
-	runner := cfg.Runner
-	if runner == nil {
-		runner = commandRunner
-	}
-	if _, err := exec.LookPath("npm"); err != nil {
-		return errors.New("npm is not available; nodejs must be installed first")
-	}
-	if _, err := runner(ctx, "npm", "install", "--global", pkg); err != nil {
-		return fmt.Errorf("npm install --global %s: %w", pkg, err)
-	}
-	return nil
-}
-
-func installTflint(ctx context.Context, cfg config, requested string) error {
-	if cfg.DryRun {
-		fmt.Printf("dry-run: would install tflint %s from GitHub releases\n", requested)
-		return nil
-	}
-	runner := cfg.Runner
-	if runner == nil {
-		runner = commandRunner
-	}
-	arch := "amd64"
-	if runtime.GOARCH == "arm64" {
-		arch = "arm64"
-	}
-	url := fmt.Sprintf(
-		"https://github.com/terraform-linters/tflint/releases/download/v%s/tflint_linux_%s.zip",
-		requested, arch,
-	)
-	tmpDir, err := os.MkdirTemp("", "tflint-*")
-	if err != nil {
-		return fmt.Errorf("create temp dir for tflint: %w", err)
-	}
-	defer os.RemoveAll(tmpDir)
-	zipPath := filepath.Join(tmpDir, "tflint.zip")
-	if _, err := runner(ctx, "curl", "--fail", "--silent", "--show-error",
-		"--location", "--retry", "3", url, "--output", zipPath); err != nil {
-		return fmt.Errorf("download tflint %s: %w", requested, err)
-	}
-	if _, err := runner(ctx, "unzip", "-q", zipPath, "-d", tmpDir); err != nil {
-		return fmt.Errorf("unzip tflint: %w", err)
-	}
-	src := filepath.Join(tmpDir, "tflint")
-	dest := "/usr/local/bin/tflint"
-	if os.Geteuid() == 0 {
-		if _, err := runner(ctx, "install", "-m", "0755", src, dest); err != nil {
-			return fmt.Errorf("install tflint binary: %w", err)
-		}
-		return nil
-	}
-	if _, err := exec.LookPath("sudo"); err != nil {
-		return errors.New("tflint installation requires root or sudo")
-	}
-	if _, err := runner(ctx, "sudo", "-n", "install", "-m", "0755", src, dest); err != nil {
-		return fmt.Errorf("sudo install tflint binary: %w", err)
-	}
-	return nil
-}
-
 type posixInstallerFn func(context.Context, config, string) error
-
-var installPriority = map[string]int{
-	"nodejs": -20, // must precede npm-dependent tools (markdownlint-cli2)
-	"python": -10, // must precede pip/pipx-dependent tools (checkov, yamllint, pre-commit)
-}
 
 var directInstallers = map[string]posixInstallerFn{
 	"yamllint": installYamllint,
-	"awscli":            installAwscli,
-	"checkov":           installCheckov,
-	"markdownlint-cli2": installMarkdownlintCli2,
-	"tflint":            installTflint,
 }
 
 func findInstalled(spec toolSpec, runner func(context.Context, string, ...string) (string, error), ctx context.Context) (string, string, error) {
@@ -891,11 +755,6 @@ func run(cfg config, selected []string) int {
 		}
 	}
 	sort.SliceStable(selected, func(i, j int) bool {
-		pi := installPriority[selected[i]]
-		pj := installPriority[selected[j]]
-		if pi != pj {
-			return pi < pj
-		}
 		return selected[i] < selected[j]
 	})
 	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
