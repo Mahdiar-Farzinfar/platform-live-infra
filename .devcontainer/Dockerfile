@@ -177,6 +177,8 @@ COPY scripts/tools/verify-env.py /opt/platform-live-infra/scripts/tools/verify-e
 
 WORKDIR /opt/platform-live-infra
 
+RUN cp tooling/.tool-versions .tool-versions
+
 RUN set -euo pipefail \
     && _docker_version=$(grep '^docker-cli ' tooling/.tool-versions | awk '{print $2}') \
     && test -n "${_docker_version}" \
