@@ -177,15 +177,16 @@ COPY scripts/tools/verify-env.py /opt/platform-live-infra/scripts/tools/verify-e
 
 WORKDIR /opt/platform-live-infra
 
-ARG DOCKER_CLI_VERSION=29.6.1
 RUN set -euo pipefail \
+    && _docker_version=$(grep '^docker-cli ' tooling/.tool-versions | awk '{print $2}') \
+    && test -n "${_docker_version}" \
     && case "${TARGETARCH}" in \
          amd64) _arch="x86_64" ;; \
          arm64) _arch="aarch64" ;; \
          *) echo "unsupported arch: ${TARGETARCH}" >&2; exit 1 ;; \
        esac \
     && curl --fail --silent --show-error --location --retry 3 \
-         "https://download.docker.com/linux/static/stable/${_arch}/docker-${DOCKER_CLI_VERSION}.tgz" \
+         "https://download.docker.com/linux/static/stable/${_arch}/docker-${_docker_version}.tgz" \
          --output /tmp/docker.tgz \
     && tar -xzf /tmp/docker.tgz --strip-components=1 -C /usr/local/bin docker/docker \
     && rm /tmp/docker.tgz \
