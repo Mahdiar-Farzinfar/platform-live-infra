@@ -496,7 +496,17 @@ jobs:
           ' "$RUNNER_TEMP/pulls.json")"
           printf '%s\n' "$pr" > "$RUNNER_TEMP/changelog-pr-number"
           gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$pr/reviews?per_page=100" > "$RUNNER_TEMP/reviews.json"
-          jq -se 'add | any(.[]; .state == "APPROVED")' "$RUNNER_TEMP/reviews.json" | grep -qx true
+          review_count=$(jq -se 'add // [] | length' "$RUNNER_TEMP/reviews.json")
+          if [[ "$review_count" -gt 0 ]]; then
+            approved=$(jq -se 'add // [] | any(.[]; .state == "APPROVED")' "$RUNNER_TEMP/reviews.json")
+            if [[ "$approved" != "true" ]]; then
+              echo "::error::PR #$pr has $review_count review(s) but none are APPROVED."
+              exit 1
+            fi
+            echo "PR #$pr approved — proceeding."
+          else
+            echo "No reviews on PR #$pr — skipping approval gate (single-contributor mode)."
+          fi
           for workflow in validate.yml security-scan.yml cross-platform-test.yml plan.yml; do
             gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs?head_sha=$GITHUB_SHA&event=push&per_page=100" \
               > "$RUNNER_TEMP/$workflow.json"
