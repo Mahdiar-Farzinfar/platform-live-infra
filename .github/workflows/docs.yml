@@ -1,0 +1,95 @@
+name: Documentation
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/docs.yml
+      - tooling/.tool-versions
+      - mkdocs.yml
+      - docs/**
+      - includes/**
+      - README.md
+      - CONTRIBUTING.md
+      - CODE_OF_CONDUCT.md
+      - SECURITY.md
+      - CHANGELOG.md
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/docs.yml
+      - tooling/.tool-versions
+      - mkdocs.yml
+      - docs/**
+      - includes/**
+      - README.md
+      - CONTRIBUTING.md
+      - CODE_OF_CONDUCT.md
+      - SECURITY.md
+      - CHANGELOG.md
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+# Serialize production deployments; only obsolete PR validations are canceled.
+concurrency:
+  group: docs-pages-${{ github.repository }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'production' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Build documentation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # Replace every action placeholder below with the verified full commit SHA of the noted release before enabling this workflow.
+      - name: Check out documentation source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  #v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Read pinned Python version
+        id: versions
+        run: |
+          version="$(awk '$1 == "python" { print $2 }' tooling/.tool-versions)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          printf 'python=%s\n' "$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  #v7.0.0
+        with:
+          python-version: ${{ steps.versions.outputs.python }}
+
+      - name: Install locked documentation dependencies
+        run: python -m pip install --disable-pip-version-check --no-input --require-hashes -r docs/requirements.txt
+
+      - name: Build and validate MkDocs site
+        run: python -m mkdocs build --strict --config-file mkdocs.yml
+
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9  # v5.0.0
+        with:
+          path: site
+
+  deploy:
+    name: Deploy documentation
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346  # v5.0.1

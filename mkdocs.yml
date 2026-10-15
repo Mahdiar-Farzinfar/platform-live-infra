@@ -1,0 +1,258 @@
+---
+# Site Information
+site_name: Platform Live Infrastructure
+site_description: Enterprise-grade AWS multi-account infrastructure as code using Terraform and Terragrunt
+site_author: Platform Engineering Team
+site_url: https://Mahdiar-Farzinfar.github.io/platform-live-infra/
+
+# Repository
+repo_name: Mahdiar-Farzinfar/platform-live-infra
+repo_url: https://github.com/Mahdiar-Farzinfar/platform-live-infra
+edit_uri: edit/main/docs/
+
+# Copyright
+copyright: Copyright &copy; Copyright 2026 Mahdiar Farzinfar
+
+# Theme Configuration
+theme:
+  name: material
+  language: en
+
+  # Color Palette
+  palette:
+    # Light mode
+    - scheme: default
+      primary: indigo
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Dark mode
+    - scheme: slate
+      primary: indigo
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+  # Typography
+  font:
+    text: Roboto
+    code: Roboto Mono
+
+  # Icons
+  icon:
+    repo: fontawesome/brands/github
+    logo: material/cloud-lock
+
+  # Features
+  features:
+    # Navigation
+    - navigation.instant        # Instant loading (XHR)
+    - navigation.tracking       # URL updates with scroll
+    - navigation.tabs           # Top-level sections as tabs
+    - navigation.tabs.sticky    # Tabs remain visible on scroll
+    - navigation.sections       # Top-level sections are rendered as group footer links
+
+    # Table of Contents
+    - toc.follow                # TOC sidebar follows scroll
+    - toc.integrate             # TOC integrated into left sidebar
+
+    # Search
+    - search.suggest            # Search suggestions
+    - search.highlight          # Highlight search results
+    - search.share              # Share search query button
+
+    # Header
+    - header.autohide           # Auto-hide header on scroll
+
+    # Content
+    - content.code.copy         # Copy button for code blocks
+    - content.code.annotate     # Code annotations
+    - content.tabs.link         # Link content tabs across page
+    - content.tooltips          # Improved tooltips
+    - content.action.edit       # Edit button on pages
+    - content.action.view       # View source button
+
+# Navigation Structure
+nav:
+  - Home: index.md
+
+  - Getting Started:
+    - Bootstrap Guide: bootstrap.md
+    - Deployment Order: deployment-order.md
+    - Cross-Platform Setup: cross-platform.md
+
+  - Architecture:
+    - State Management: state-management.md
+    - Foundation Layer: foundation-layer.md
+    - Workload Accounts: workload-accounts.md
+
+  - Operations:
+    - Day-to-Day Operations: operations.md
+    - Drift Detection: drift-detection.md
+    - Security Baseline: security-baseline.md
+    - Disaster Recovery: disaster-recovery.md
+
+# Plugins
+plugins:
+  - search:
+      lang: en
+      separator: '[\s\-,:!=\[\]()"/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
+
+  - tags:
+      {}
+
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: timeago
+      fallback_to_build_date: true
+
+  - minify:
+      minify_html: true
+      minify_js: true
+      minify_css: true
+      htmlmin_opts:
+        remove_comments: true
+      cache_safe: true
+
+  - macros
+
+  - glightbox:
+      touchNavigation: true
+      loop: false
+      effect: zoom
+      slide_effect: slide
+      width: 100%
+      height: auto
+      zoomable: true
+      draggable: true
+
+# Extensions
+markdown_extensions:
+  # Python Markdown
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      permalink_title: Anchor link to this section
+      toc_depth: 3
+
+  # Python Markdown Extensions
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.mark
+  - pymdownx.tilde
+  - pymdownx.critic:
+      mode: view
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+      use_pygments: true
+      auto_title: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      repo_url_shorthand: true
+      user: Mahdiar-Farzinfar
+      repo: platform-live-infra
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      check_paths: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.tasklist:
+      custom_checkbox: true
+      clickable_checkbox: false
+
+# Extra Configuration
+extra:
+  # Version Provider
+  version:
+    provider: mike
+    default: stable
+
+  # Social Links
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Mahdiar-Farzinfar/platform-live-infra
+      name: GitHub Repository
+    - icon: fontawesome/brands/github
+      link: https://github.com/Mahdiar-Farzinfar/platform-live-infra/discussions
+      name: GitHub Discussions
+    - icon: fontawesome/solid/shield-halved
+      link: https://github.com/Mahdiar-Farzinfar/platform-live-infra/security/advisories
+      name: Report a Vulnerability
+    - icon: fontawesome/solid/scale-balanced
+      link: https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/CODE_OF_CONDUCT.md
+      name: Code of Conduct
+
+  # Analytics (optional)
+  analytics:
+    provider: google
+    property: G-XXXXXXXXXX
+    feedback:
+      title: Was this page helpful?
+      ratings:
+        - icon: material/emoticon-happy-outline
+          name: This page was helpful
+          data: 1
+          note: Thanks for your feedback!
+        - icon: material/emoticon-sad-outline
+          name: This page could be improved
+          data: 0
+          note: Thanks for your feedback! Help us improve by opening an issue.
+
+  # Tags
+  tags:
+    AWS: aws
+    Terraform: terraform
+    Terragrunt: terragrunt
+    Security: security
+    Foundation: foundation
+    Workloads: workloads
+    Cross-Platform: cross-platform
+
+# Extra CSS
+extra_css:
+  - stylesheets/extra.css
+
+# Extra JavaScript
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js
+  - javascripts/mermaid.js
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+# Validation
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+
+# Development Server
+dev_addr: 127.0.0.1:8000
+
+# Build Directory
+site_dir: site
