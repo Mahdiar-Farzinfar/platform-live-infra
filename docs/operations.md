@@ -15,13 +15,15 @@ Keep these operation classes distinct:
 | Infrastructure or state mutation | Changes cloud resources or state location/content. Requires a separately authorized procedure. |
 | CI-only automation | Runs under workflow conditions and credentials; a local task with a similar name is not equivalent. |
 
-The task definitions in [Taskfile.yml](../Taskfile.yml) are the command source of truth. [justfile](../justfile) and [Makefile](../Makefile) delegate to Task and do not define independent behavior.
+The task definitions in [Taskfile.yml](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/Taskfile.yml) are the command source of truth. [justfile](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/justfile) and [Makefile](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/Makefile) delegate to Task and do not define independent behavior.
 
 ## Operational Model
 
-The live tree composes account and Region context with leaf Terragrunt stacks. The root [live/terragrunt.hcl](../live/terragrunt.hcl) and [live/common.hcl](../live/common.hcl) expose catalog data; account and region files project that context. Shared layers configure providers, remote state, and tags. Module references are selected in [module-versions.hcl](../live/catalogs/module-versions.hcl).
+The live tree composes account and Region context with leaf Terragrunt stacks. The root [live/terragrunt.hcl](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/live/terragrunt.hcl) and [live/common.hcl](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/live/common.hcl) expose catalog data;
+account and region files project that context. Shared layers configure providers, remote state, and tags. Module references are selected in [module-versions.hcl](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/live/catalogs/module-versions.hcl).
 
-The bootstrap stack is exceptional: it starts with local state because the remote backend does not yet exist. Normal stacks include [remote-state.hcl](../live/_envcommon/remote-state.hcl), which describes S3 state, encryption, and DynamoDB locking. The checked-in backend metadata remains incomplete. Do not infer a usable backend from the presence of the configuration.
+The bootstrap stack is exceptional: it starts with local state because the remote backend does not yet exist. Normal stacks include [remote-state.hcl](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/live/_envcommon/remote-state.hcl), which describes S3 state,
+encryption, and DynamoDB locking. The checked-in backend metadata remains incomplete. Do not infer a usable backend from the presence of the configuration.
 
 ## Safety and Control Boundaries
 
@@ -40,7 +42,8 @@ Never commit credentials, generated state, plan files, backend files, or provide
 
 ## Repository Execution Order
 
-The authoritative sequence and readiness metadata are in [inventory/deployment-order.yaml](../inventory/deployment-order.yaml). The owner mapping is [inventory/stack-owners.yaml](../inventory/stack-owners.yaml); [CODEOWNERS](../CODEOWNERS) also provides repository review routing. Do not infer order from directory names or lexical path order.
+The authoritative sequence and readiness metadata are in [inventory/deployment-order.yaml](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/inventory/deployment-order.yaml).
+The owner mapping is [inventory/stack-owners.yaml](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/inventory/stack-owners.yaml); [CODEOWNERS](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/CODEOWNERS) also provides repository review routing. Do not infer order from directory names or lexical path order.
 
 | Phase | Inventory stacks | Key boundary |
 | --- | --- | --- |
@@ -65,18 +68,18 @@ For the account, Region, exact stack path, current inputs, and dependency requir
 
 | Step | Purpose and source | Effect classification | Evidence and failure response |
 | --- | --- | --- | --- |
-| 1. Confirm revision and root | Inspect Git status/revision and confirm the current directory is the repository root. Follow [CONTRIBUTING.md](../CONTRIBUTING.md). | Read-only inspection. | Record revision and working tree state. Resolve unexpected local changes before interpreting checks. |
-| 2. Identify shell/platform | Check the actual shell and platform before using a wrapper. Setup wrappers are [setup.sh](../scripts/cross-platform/setup.sh) and [setup.ps1](../scripts/cross-platform/setup.ps1); both delegate to [setup.py](../scripts/cross-platform/setup.py). | Inspection is read-only; setup can install software and change the local host. | Capture platform, shell, and wrapper error. Do not run a provisioning setup path if local software installation is not approved. |
-| 3. Check toolchain | Review pins in [tooling](../tooling/.tool-versions) and run `task verify-env` as described by the task and verifier. | Read-only local check. | Retain sanitized output and tool versions. Resolve missing or unsupported tools using the repository setup guidance. |
+| 1. Confirm revision and root | Inspect Git status/revision and confirm the current directory is the repository root. Follow [CONTRIBUTING.md](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/CONTRIBUTING.md). | Read-only inspection. | Record revision and working tree state. Resolve unexpected local changes before interpreting checks. |
+| 2. Identify shell/platform | Check the actual shell and platform before using a wrapper. Setup wrappers are [setup.sh](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/scripts/cross-platform/setup.sh) and [setup.ps1](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/scripts/cross-platform/setup.ps1); both delegate to [setup.py](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/scripts/cross-platform/setup.py). | Inspection is read-only; setup can install software and change the local host. | Capture platform, shell, and wrapper error. Do not run a provisioning setup path if local software installation is not approved. |
+| 3. Check toolchain | Review pins in [tooling](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/tooling/.tool-versions) and run `task verify-env` as described by the task and verifier. | Read-only local check. | Retain sanitized output and tool versions. Resolve missing or unsupported tools using the repository setup guidance. |
 | 4. Confirm scope and ownership | Read both inventories, account/Region context, leaf HCL, shared includes, and module version. | Read-only inspection. | Record stack ID/path, owner, account alias, Region, dependencies, and revision. Stop if they disagree or contain unresolved placeholders. |
 | 5. Run static validation | Use the named validation tasks below and inspect their exact Taskfile commands. | Validation; may write local caches/download dependencies. No AWS access is intended by backend-disabled Terraform validation. | Record command, revision, and result. Fix the source or escalate; do not bypass failed checks. |
-| 6. Consider a plan only in an authorized context | The workflow Plan job runs cloud plans only for trusted `main`; see [plan.yml](../.github/workflows/plan.yml) and [plan.py](../scripts/ci/plan.py). | State-aware read-only review: AWS identity, remote state, cloud reads, and possibly lock operations. | Review exact account, Region, state key, dependency outputs, replacements, and policy effects. Treat failures as unresolved, not as approval. |
+| 6. Consider a plan only in an authorized context | The workflow Plan job runs cloud plans only for trusted `main`; see [plan.yml](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/.github/workflows/plan.yml) and [plan.py](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/scripts/ci/plan.py). | State-aware read-only review: AWS identity, remote state, cloud reads, and possibly lock operations. | Review exact account, Region, state key, dependency outputs, replacements, and policy effects. Treat failures as unresolved, not as approval. |
 | 7. Stop before mutation | Check governance and the current supported delivery path. | No mutation in this guide's normal workflow. | Escalate through the accountable owner and approved change process. Do not treat an advisory plan or safe-skip as authorization. |
 | 8. Verify only through the supported check | The post-apply workflow/script checks an inventory selection and local rendered baseline; its live checks are pending. | CI-only check; local baseline portion renders config, no live AWS posture proof. | Preserve workflow summary and separately approved runtime evidence. A passing configuration check is not proof of deployment health. |
 
 ## Validation and Smoke Testing
 
-Commands below are defined by [Taskfile.yml](../Taskfile.yml). Run from the repository root unless the task explicitly takes a target. These checks are not all equivalent:
+Commands below are defined by [Taskfile.yml](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/Taskfile.yml). Run from the repository root unless the task explicitly takes a target. These checks are not all equivalent:
 
 | Command/workflow | Classification | What it checks and limits |
 | --- | --- | --- |
@@ -86,12 +89,12 @@ Commands below are defined by [Taskfile.yml](../Taskfile.yml). Run from the repo
 | `task validate:scp:json` | Local validation | Parses JSON policy files under `policies/scp`. |
 | `task lint:yaml`, `task lint:markdown`, `task lint:terraform`, `task lint:actions` | Local lint | Run configured linters. `lint:terraform` and Actionlint require their tools. |
 | `task validate:terraform` | Backend-disabled local validation | Runs init with `-backend=false`, then validate. May retrieve modules/providers and write local caches; it does not validate remote state or AWS resources. |
-| `task verify:security-baseline` | Local rendered-configuration smoke check | [verify-security-baseline.py](../tests/smoke/verify-security-baseline.py) checks configured baseline through local Terragrunt renders. It is not a live AWS security assessment. |
-| `task plan` | State-aware planning | Calls [plan.py](../scripts/ci/plan.py). The default task is non-strict and known placeholder/credential failures may be tolerated. It can access remote state/cloud APIs and is not a deployment approval. Avoid local cloud planning unless the documented prerequisites and authorization are satisfied. |
+| `task verify:security-baseline` | Local rendered-configuration smoke check | [verify-security-baseline.py](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/tests/smoke/verify-security-baseline.py) checks configured baseline through local Terragrunt renders. It is not a live AWS security assessment. |
+| `task plan` | State-aware planning | Calls [plan.py](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/scripts/ci/plan.py). The default task is non-strict and known placeholder/credential failures may be tolerated. It can access remote state/cloud APIs and is not a deployment approval. Avoid local cloud planning unless the documented prerequisites and authorization are satisfied. |
 | Plan workflow pull-request job | CI-only metadata validation | Checks changed-stack selection and inventory without AWS access; it does not create a cloud plan. |
 | Plan workflow trusted-main job | CI-only state-aware planning | Assumes a configured read-only identity and plans remote-state stacks. A green result is only meaningful within the script's reported scope; output is advisory and is not saved for apply. |
-| Drift review | State-aware, read-only drift inspection | `task drift` uses [drift-ci.py](../scripts/ci/drift-ci.py) to inspect remote-state stacks and requires cloud/backend access. The CI workflow invokes the same `task drift` command, typically through a scheduled or manual execution using a read-only identity. The process is review-only and does not repair or apply drift. |
-| Post-Apply Verification workflow | CI-only configuration check | Manually selects an inventory stack and commit. [verify-post-apply.py](../scripts/ci/verify-post-apply.py) runs configured checks and reports live checks pending; it does not prove deployment or live health. |
+| Drift review | State-aware, read-only drift inspection | `task drift` uses [drift-ci.py](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/scripts/ci/drift-ci.py) to inspect remote-state stacks and requires cloud/backend access. The CI workflow invokes the same `task drift` command, typically through a scheduled or manual execution using a read-only identity. The process is review-only and does not repair or apply drift. |
+| Post-Apply Verification workflow | CI-only configuration check | Manually selects an inventory stack and commit. [verify-post-apply.py](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/scripts/ci/verify-post-apply.py) runs configured checks and reports live checks pending; it does not prove deployment or live health. |
 | Apply workflow | CI-only safe skip | Until this project transitions to live infrastructure, the CI workflow intentionally runs `task apply` with `APPLY=false`; therefore, no AWS resources are created or modified. |
 
 The complete `task validate` aggregate also runs repository lint tasks; inspect its dependencies and installed tool requirements before use. The security workflow runs configured scanners through `task security-all`; its scope, exclusions, and thresholds are defined in the Taskfile and workflow. Passing a scanner is evidence only for that configured scan.
@@ -113,11 +116,11 @@ deployment path.
 
 The bootstrap stack's first apply creates backend resources with local state;
 the separate migration procedure changes state placement. In
-[01-create-backend.py](../scripts/bootstrap/01-create-backend.py),
+[01-create-backend.py](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/scripts/bootstrap/01-create-backend.py),
 `--dry-run` validates and reports intended commands without running Terraform,
 while `--plan` runs backend-disabled init, validation, and a Terraform plan.
 That plan is non-mutating but may make provider/API reads and needs appropriate
-context. In [02-migrate-to-remote.py](../scripts/bootstrap/02-migrate-to-remote.py),
+context. In [02-migrate-to-remote.py](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/scripts/bootstrap/02-migrate-to-remote.py),
 list/plan/dry-run modes inspect stack selection and local metadata;
 `--migrate` validates AWS/backend context, creates backups, and changes state
 placement. Creation and migration are controlled operations with their own
@@ -141,7 +144,8 @@ destroy, state editing, or recovery commands to test an environment.
 ## Security and Governance
 
 Repository-defined guardrails include reviewed contribution/change processes,
-deployment-order and owner inventories, policy documents under [policies/scp](../policies/scp/), and the security requirements in [SECURITY.md](../SECURITY.md). SCP policy files and stack configuration document the intended governance controls and provide a clear foundation for their controlled rollout and future validation in the live environment.
+deployment-order and owner inventories, policy documents under [policies/scp](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/policies/scp/), and the security requirements in [SECURITY.md](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/SECURITY.md).
+SCP policy files and stack configuration document the intended governance controls and provide a clear foundation for their controlled rollout and future validation in the live environment.
 
 Operational recommendations: use least-privilege, approved identities; verify
 intended account, Region, stack, and state before any cloud operation; preserve

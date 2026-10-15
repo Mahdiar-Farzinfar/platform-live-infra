@@ -62,7 +62,7 @@ bootstrap stack itself is not a normal consuming stack.
 Terragrunt dependencies can read outputs from other stacks; the deployment
 inventory defines ordering and readiness. This dependency behavior does not
 merge states: each stack remains a separate state unit. Review
-[`inventory/deployment-order.yaml`](../inventory/deployment-order.yaml) and
+[`inventory/deployment-order.yaml`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/inventory/deployment-order.yaml) and
 the individual stack configuration before operating on a dependency chain.
 
 ## Evidence and Control Boundaries
@@ -84,7 +84,7 @@ disaster-recovery guarantee.
 
 ### Backend creation
 
-[`live/bootstrap/backend-bootstrap/terragrunt.hcl`](../live/bootstrap/backend-bootstrap/terragrunt.hcl)
+[`live/bootstrap/backend-bootstrap/terragrunt.hcl`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/live/bootstrap/backend-bootstrap/terragrunt.hcl)
 selects the backend-bootstrap module and enables access logging, deletion
 protection, and noncurrent-version retention inputs. Module implementation is
 external to this repository, so these inputs alone do not prove deployed
@@ -92,7 +92,7 @@ bucket behavior. The root/shared configuration and catalogs currently lack
 concrete backend-bootstrap metadata, and account IDs contain placeholders.
 The bootstrap helper fails closed on unresolved values for apply.
 
-[`scripts/bootstrap/01-create-backend.py`](../scripts/bootstrap/01-create-backend.py)
+[`scripts/bootstrap/01-create-backend.py`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/scripts/bootstrap/01-create-backend.py)
 validates repository context and orchestrates Terragrunt; it does not itself
 create AWS resources. Its default/`--plan` path initializes with
 `--backend=false`, validates, and plans. `--dry-run` prints intended commands.
@@ -100,12 +100,12 @@ create AWS resources. Its default/`--plan` path initializes with
 `--yes` with `--non-interactive`; the script then runs apply with
 `-auto-approve`. That prompt is not an authorization workflow. See
 [`docs/bootstrap.md`](bootstrap.md) and the repository's
-[execution policy](../README.md#infrastructure-execution-policy) before any
+[execution policy](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/README.md#infrastructure-execution-policy) before any
 approved bootstrap exception.
 
 ### State migration
 
-[`scripts/bootstrap/02-migrate-to-remote.py`](../scripts/bootstrap/02-migrate-to-remote.py)
+[`scripts/bootstrap/02-migrate-to-remote.py`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/scripts/bootstrap/02-migrate-to-remote.py)
 discovers non-bootstrap stacks, supports explicit stack selection and include
 or exclude filters, and reports local/remote classification. Its list, plan,
 and dry-run modes do not perform the migration; dry-run does not make the
@@ -175,7 +175,7 @@ rendered inputs; it does not query AWS or inspect Terraform state.
    operation. This is operator discipline, not a repository-enforced runtime
    check for every local command.
 2. Run `task verify-env` and compare installed versions with
-   [`tooling/.tool-versions`](../tooling/.tool-versions). This verifies local
+   [`tooling/.tool-versions`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/tooling/.tool-versions). This verifies local
    tooling only.
 3. Inspect the stack's `account.hcl`, `region.hcl`, includes, and shared
    backend/provider layers. Verify target identity through the approved
@@ -194,7 +194,7 @@ rendered inputs; it does not query AWS or inspect Terraform state.
 
 ## CI/CD, Drift, and State Integrity
 
-[`plan.yml`](../.github/workflows/plan.yml) gives pull requests a metadata and
+[`plan.yml`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/.github/workflows/plan.yml) gives pull requests a metadata and
 inventory validation path without AWS credentials. Trusted `main` runs assume
 a read-only identity using GitHub OIDC and execute advisory plans. The plan
 script captures command output rather than publishing raw state or plans; the
@@ -202,7 +202,7 @@ workflow says results are not saved-plan artifacts, do not authorize apply,
 and are not uploaded or commented on. Its workflow-level concurrency does not
 cover the drift workflow or external operations.
 
-[`drift-detection.yml`](../.github/workflows/drift-detection.yml) is executed
+[`drift-detection.yml`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/.github/workflows/drift-detection.yml) is executed
 on a schedule or through manual dispatch against `main`. It assumes the
 configured OIDC planning identity and invokes the repository-defined
 `task drift` target. The checked-in `Taskfile` defines `drift` as the canonical
@@ -225,15 +225,15 @@ for scanning and by the permissions and access available to that specific
 workflow run; the scan does not prove that every resource is represented in
 Terraform State or identify every possible out-of-band condition.
 
-[`post-apply-verify.yml`](../.github/workflows/post-apply-verify.yml) is
+[`post-apply-verify.yml`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/.github/workflows/post-apply-verify.yml) is
 manually dispatched for an inventory stack and revision. Its script runs a
 repository-wide local configuration smoke test and reports inventory live
 checks as pending. It does not verify deployed AWS posture. The checked-in
-[`apply.yml`](../.github/workflows/apply.yml) intentionally uses a safe-skip
+[`apply.yml`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/.github/workflows/apply.yml) intentionally uses a safe-skip
 path without AWS credentials, so a successful run is not evidence of an apply.
 
-[`validate.yml`](../.github/workflows/validate.yml) and
-[`security-scan.yml`](../.github/workflows/security-scan.yml) run static,
+[`validate.yml`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/.github/workflows/validate.yml) and
+[`security-scan.yml`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/.github/workflows/security-scan.yml) run static,
 lint, and source-configuration checks. Workflow definitions do not prove
 external branch protection or required status checks. Workflow permissions,
 OIDC configuration, deployment environment rules, and observed runtime access
@@ -276,8 +276,8 @@ operational data:
 These are safety requirements, not proof that external IAM, AWS bucket policy,
 KMS key policy, SCP attachments, audit logging, or GitHub environment settings
 are deployed or effective. Source policy files likewise do not prove
-attachment or runtime enforcement. See [`SECURITY.md`](../SECURITY.md) and
-the [security baseline checklist](../tests/smoke/security-baseline-checklist.md).
+attachment or runtime enforcement. See [`SECURITY.md`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/SECURITY.md) and
+the [security baseline checklist](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/tests/smoke/security-baseline-checklist.md).
 
 ## Failure Handling and Troubleshooting
 
@@ -290,10 +290,10 @@ the [security baseline checklist](../tests/smoke/security-baseline-checklist.md)
 | Plan or drift scan reports operational error | Provider, inventory, backend/state access, or execution failure | Distinguish operational error from detected drift; preserve stack and run evidence, then resolve access/configuration through review. Do not apply while state is uncertain. |
 | Drift scan reports drift | Detailed plan exit code indicates changes are needed | Review the exact stack and plan through the approved change process. Drift output alone does not authorize a change. |
 
-Use the owner metadata in [`inventory/stack-owners.yaml`](../inventory/stack-owners.yaml)
+Use the owner metadata in [`inventory/stack-owners.yaml`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/inventory/stack-owners.yaml)
 where a stack owner is defined. Follow the repository's
-[contribution and review guidance](../CONTRIBUTING.md) and
-[security policy](../SECURITY.md); this document does not define response-time
+[contribution and review guidance](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/CONTRIBUTING.md) and
+[security policy](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/SECURITY.md); this document does not define response-time
 commitments or a separate incident escalation chain.
 
 ## Change Management
@@ -301,9 +301,9 @@ commitments or a separate incident escalation chain.
 Changes to backend configuration, state-key derivation, migration scripts,
 workflow identity or concurrency, and state-related tasks should be submitted
 as reviewed repository changes with the affected operational documentation
-updated. [`CODEOWNERS`](../CODEOWNERS), the
-[pull request template](../.github/PULL_REQUEST_TEMPLATE.md), and
-[`CONTRIBUTING.md`](../CONTRIBUTING.md) define repository review guidance.
+updated. [`CODEOWNERS`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/CODEOWNERS), the
+[pull request template](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/.github/PULL_REQUEST_TEMPLATE.md), and
+[`CONTRIBUTING.md`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/CONTRIBUTING.md) define repository review guidance.
 Inspect the exact workflow run and plan evidence for the reviewed revision.
 GitHub branch protection and environment approvals are enabled. Required
 reviews are not currently enabled because the repository is maintained by a

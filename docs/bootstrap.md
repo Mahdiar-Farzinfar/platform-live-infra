@@ -32,10 +32,10 @@ not provide a separate backend-output export command. Review approved backend
 outputs and populate the repository's designated configuration through a
 reviewed change before migration.
 
-The [deployment inventory](../inventory/deployment-order.yaml) places backend
+The [deployment inventory](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/inventory/deployment-order.yaml) places backend
 creation and state migration before foundation and workload phases. Use it as
 the source for stack dependencies, readiness conditions, and deployment order.
-The [repository execution policy](../README.md#infrastructure-execution-policy)
+The [repository execution policy](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/README.md#infrastructure-execution-policy)
 requires workflow execution for routine infrastructure changes. Initial
 backend creation and state migration are controlled exceptions and require
 separate authorization and safeguards described there; they do not authorize
@@ -195,7 +195,7 @@ path to apply; the helper explicitly prohibits unresolved values for apply.
 ### 4. Create the backend — **CLOUD MUTATION**
 
 Only under the separately authorized initial-bootstrap exception described in
-the [execution policy](../README.md#controlled-exceptions), and only after
+the [execution policy](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/README.md#controlled-exceptions), and only after
 review of the exact plan, target account, Region, and recovery approach:
 
 ```bash
@@ -269,7 +269,7 @@ maintenance scope. The default migration behavior is fail-fast.
 Only after the selected stack's migration reports success and its remote state
 has been verified should normal remote-state operations proceed. Follow the
 phases, dependencies, readiness requirements, approvals, and checks in
-[`inventory/deployment-order.yaml`](../inventory/deployment-order.yaml).
+[`inventory/deployment-order.yaml`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/inventory/deployment-order.yaml).
 Routine infrastructure changes follow the approved GitHub Actions path and
 repository change policy; this guide does not provide an apply command for
 foundation or workload stacks. The checked-in `apply.yml` workflow currently
@@ -312,8 +312,8 @@ live AWS posture.
 | CI validation fails | Use the failing workflow/job output and fix the reviewed change. Do not bypass validation or infer that cloud bootstrap ran. |
 
 Bootstrap stack ownership is listed in
-[`inventory/stack-owners.yaml`](../inventory/stack-owners.yaml). Follow the
-repository's [security policy](../SECURITY.md) for security issues.
+[`inventory/stack-owners.yaml`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/inventory/stack-owners.yaml). Follow the
+repository's [security policy](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/SECURITY.md) for security issues.
 
 ## Operational guardrails
 

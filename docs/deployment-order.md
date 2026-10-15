@@ -4,7 +4,8 @@ This guide records the deployment sequence and dependency evidence in the checke
 
 ## Authority and evidence
 
-[`inventory/deployment-order.yaml`](../inventory/deployment-order.yaml) is the declared deployment inventory. It lists ten Terragrunt leaves, phases, waves, `parallel` flags, readiness gates, post-deployment checks, and stack `depends_on` metadata. [`inventory/stack-owners.yaml`](../inventory/stack-owners.yaml) maps those leaf paths to owners.
+[`inventory/deployment-order.yaml`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/inventory/deployment-order.yaml) is the declared deployment inventory. It lists ten Terragrunt leaves, phases, waves,
+`parallel` flags, readiness gates, post-deployment checks, and stack `depends_on` metadata. [`inventory/stack-owners.yaml`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/inventory/stack-owners.yaml) maps those leaf paths to owners.
 
 The plan-matrix validator reads both inventories. It checks stack discovery, IDs, phase/wave assignment, ownership coverage, and that declared dependencies occur in an earlier phase or wave. This validates inventory metadata; it does not deploy stacks or schedule applies.
 
@@ -23,20 +24,23 @@ Evidence labels used below:
 The inventory order is the operator sequence. Complete a phase's readiness checks before entering the next phase. Inventory `parallel: true` describes a declared wave boundary; it is not proof that concurrent applies are safe or an execution guarantee. Serialize applies unless the operators have separately confirmed independent states, credentials, service prerequisites, and change windows.
 
 1. **Bootstrap**
-   - Stack: [`live/bootstrap/backend-bootstrap`](../live/bootstrap/backend-bootstrap/terragrunt.hcl); sole stack in a `parallel: false` wave.
+   - Stack: [`live/bootstrap/backend-bootstrap`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/live/bootstrap/backend-bootstrap/terragrunt.hcl); sole stack in a `parallel: false` wave.
    - Gate: approve concrete inputs, create the backend with local state, verify it, and record the separate local-to-remote migration before remote-state operations.
 2. **Management and archive prerequisites**
-   - Stacks: [`live/foundation/management/us-east-1/github-oidc`](../live/foundation/management/us-east-1/github-oidc/terragrunt.hcl) and [`live/foundation/log-archive/us-east-1/kms`](../live/foundation/log-archive/us-east-1/kms/terragrunt.hcl); inventory wave marked `parallel: true`.
+   - Stacks: [`live/foundation/management/us-east-1/github-oidc`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/live/foundation/management/us-east-1/github-oidc/terragrunt.hcl) and [`live/foundation/log-archive/us-east-1/kms`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/live/foundation/log-archive/us-east-1/kms/terragrunt.hcl);
+   inventory wave marked `parallel: true`.
    - Gate: verify account/provider context, exact OIDC trust and role permissions, and approved KMS administration and service access.
 3. **Governance and archive storage**
-   - Stacks: [`live/foundation/management/us-east-1/scp`](../live/foundation/management/us-east-1/scp/terragrunt.hcl) and [`live/foundation/log-archive/us-east-1/log-archive-bucket`](../live/foundation/log-archive/us-east-1/log-archive-bucket/terragrunt.hcl); inventory wave marked `parallel: true`.
+   - Stacks: [`live/foundation/management/us-east-1/scp`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/live/foundation/management/us-east-1/scp/terragrunt.hcl) and [`live/foundation/log-archive/us-east-1/log-archive-bucket`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/live/foundation/log-archive/us-east-1/log-archive-bucket/terragrunt.hcl);
+   inventory wave marked `parallel: true`.
    - Dependency and gate: the bucket has a Terragrunt KMS dependency. Review SCP targets and exceptions; settle Object Lock/retention decisions and verify the key output and CloudTrail delivery requirements.
 4. **Security services**
-   - Stacks: [`live/foundation/security/us-east-1/cloudtrail`](../live/foundation/security/us-east-1/cloudtrail/terragrunt.hcl) and [`live/foundation/security/us-east-1/guardduty`](../live/foundation/security/us-east-1/guardduty/terragrunt.hcl); inventory wave marked `parallel: true`.
+   - Stacks: [`live/foundation/security/us-east-1/cloudtrail`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/live/foundation/security/us-east-1/cloudtrail/terragrunt.hcl) and [`live/foundation/security/us-east-1/guardduty`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/live/foundation/security/us-east-1/guardduty/terragrunt.hcl);
+   inventory wave marked `parallel: true`.
    - Dependency and gate: CloudTrail depends on the archive bucket in Terragrunt; GuardDuty has no Terragrunt dependency on CloudTrail. Verify Security account credentials and service prerequisites. The inventory records delegated-administrator registration as a separate management-account operation; no live stack implements it.
 5. **Workload baselines**
    - Stacks: sandbox SCP attachments, security baseline, and test IAM roles. The inventory marks their wave `parallel: true`.
-   - Paths: [`scp-attachments`](../live/workloads/sandbox-account/us-east-1/scp-attachments/terragrunt.hcl), [`security-baseline`](../live/workloads/sandbox-account/us-east-1/security-baseline/terragrunt.hcl), and [`test-iam-roles`](../live/workloads/sandbox-account/us-east-1/test-iam-roles/terragrunt.hcl).
+   - Paths: [`scp-attachments`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/live/workloads/sandbox-account/us-east-1/scp-attachments/terragrunt.hcl), [`security-baseline`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/live/workloads/sandbox-account/us-east-1/security-baseline/terragrunt.hcl), and [`test-iam-roles`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/live/workloads/sandbox-account/us-east-1/test-iam-roles/terragrunt.hcl).
    - Gate: inventory lists distinct prerequisites, but these leaves declare no Terragrunt dependency blocks. Verify sandbox target, management policy context, centralized security readiness, and exact read-only test-role trust and permissions. These are sandbox/test configurations, not evidence of production deployment.
 
 Use the inventory's full stack IDs and `depends_on` values when selecting a stack in workflow inputs.
@@ -112,7 +116,8 @@ The checked-in repository does not implement a routine applying workflow that co
 
 ## Safe operator sequence
 
-1. **Review the change and scope.** Confirm the exact inventory stack IDs, paths, owners, account and Region catalog entries, module selection, and any relevant policy changes. Resolve placeholders through reviewed configuration; never guess IDs or backend values. Start with [`README.md`](../README.md), [`CONTRIBUTING.md`](../CONTRIBUTING.md), and [`SECURITY.md`](../SECURITY.md).
+1. **Review the change and scope.** Confirm the exact inventory stack IDs, paths, owners, account and Region catalog entries, module selection, and any relevant policy changes. Resolve placeholders through reviewed configuration;
+never guess IDs or backend values. Start with [`README.md`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/README.md), [`CONTRIBUTING.md`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/CONTRIBUTING.md), and [`SECURITY.md`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/SECURITY.md).
 2. **Check the execution path and prerequisites.** Confirm required workflow checks and protections are available. For initial bootstrap or state migration, follow [`docs/bootstrap.md`](bootstrap.md) and its controlled-operation requirements. Confirm identity and target context using approved means without printing credentials or sensitive identifiers.
 3. **Run non-mutating validation.** Use the repository's `task validate`, lint, and security-scan workflows as applicable. For a scoped local Terraform validation, `task validate:terraform TARGET=live/.../stack` uses backend-disabled init; check `Taskfile.yml` before selecting a target. Record the revision and result.
 4. **Review plans and upstream readiness.** Use the read-only planning workflow and relevant inventory readiness checks. Examine account, Region, state, policy, encryption, replacement, and cross-account effects in the trusted environment. A plan is advisory and must not be substituted for an approved deployment artifact.
@@ -139,7 +144,8 @@ Do not delete or manually edit state, bypass locking, force-unlock without docum
 
 ## Ownership and maintenance
 
-Use [`inventory/stack-owners.yaml`](../inventory/stack-owners.yaml) and [`CODEOWNERS`](../CODEOWNERS) for review routing. When stack paths, dependencies, phase/wave boundaries, readiness checks, or workflow behavior change, update this guide and authoritative configuration in the same reviewed change.
+Use [`inventory/stack-owners.yaml`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/inventory/stack-owners.yaml) and [`CODEOWNERS`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/CODEOWNERS) for review routing. When stack paths, dependencies,
+phase/wave boundaries, readiness checks, or workflow behavior change, update this guide and authoritative configuration in the same reviewed change.
 
 Tie claims about deployment, runtime health, and drift to dated, sanitized runtime evidence.
 

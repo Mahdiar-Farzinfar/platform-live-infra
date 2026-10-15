@@ -188,7 +188,7 @@ is strictly prohibited regardless of credentials. See the
 ## Prerequisites
 
 Verify the toolchain matches the pinned versions in
-[`tooling/.tool-versions`](../tooling/.tool-versions) before any local
+[`tooling/.tool-versions`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/tooling/.tool-versions) before any local
 operation.
 
 | Tool | Pinned version |
@@ -340,4 +340,4 @@ See [state management](state-management.md) and the
     - Plans are advisory. A successful plan, passing validation, or green CI
       run does not authorize an apply.
 
-See [`SECURITY.md`](../SECURITY.md) for the full security policy.
+See [`SECURITY.md`](https://github.com/Mahdiar-Farzinfar/platform-live-infra/blob/main/SECURITY.md) for the full security policy.

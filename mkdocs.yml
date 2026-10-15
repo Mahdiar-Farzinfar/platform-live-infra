@@ -86,14 +86,9 @@ nav:
 
   - Architecture:
     - State Management: state-management.md
-    - Foundation Layer: foundation-layer.md
-    - Workload Accounts: workload-accounts.md
 
   - Operations:
     - Day-to-Day Operations: operations.md
-    - Drift Detection: drift-detection.md
-    - Security Baseline: security-baseline.md
-    - Disaster Recovery: disaster-recovery.md
 
 # Plugins
 plugins:
