@@ -1,0 +1,657 @@
+/**
+ * Platform Live Infrastructure - Documentation Styles
+ *
+ * Enhancement layer for Material for MkDocs theme.
+ * Organized by system: tokens → typography → components → layout → utilities.
+ */
+
+/* ==========================================================================
+   Design Tokens - Color System
+   ========================================================================== */
+
+:root {
+  /* Neutral ramp - OKLCH-inspired lightness steps for even perceived brightness */
+  --neutral-50: hsl(220, 20%, 98%);
+  --neutral-100: hsl(220, 18%, 96%);
+  --neutral-200: hsl(220, 16%, 92%);
+  --neutral-300: hsl(220, 14%, 85%);
+  --neutral-400: hsl(220, 12%, 70%);
+  --neutral-500: hsl(220, 10%, 55%);
+  --neutral-600: hsl(220, 12%, 40%);
+  --neutral-700: hsl(220, 14%, 28%);
+  --neutral-800: hsl(220, 16%, 18%);
+  --neutral-900: hsl(220, 18%, 12%);
+
+  /* Accent ramp - Indigo to match theme */
+  --accent-50: hsl(231, 100%, 98%);
+  --accent-100: hsl(231, 94%, 95%);
+  --accent-200: hsl(231, 94%, 88%);
+  --accent-300: hsl(231, 92%, 78%);
+  --accent-400: hsl(231, 89%, 68%);
+  --accent-500: hsl(231, 48%, 48%);
+  --accent-600: hsl(231, 48%, 42%);
+  --accent-700: hsl(231, 47%, 34%);
+  --accent-800: hsl(231, 45%, 26%);
+  --accent-900: hsl(231, 43%, 18%);
+
+  /* Semantic colors - tuned for infrastructure context */
+  --success: hsl(142, 71%, 45%);
+  --success-bg: hsl(142, 76%, 96%);
+  --warning: hsl(38, 92%, 50%);
+  --warning-bg: hsl(38, 100%, 96%);
+  --danger: hsl(0, 84%, 60%);
+  --danger-bg: hsl(0, 100%, 97%);
+  --info: hsl(199, 89%, 48%);
+  --info-bg: hsl(199, 100%, 96%);
+
+  /* Surface tokens - semantic layer */
+  --surface-base: hsl(0, 0%, 100%);
+  --surface-raised: var(--neutral-50);
+  --surface-overlay: hsl(0, 0%, 100%);
+
+  --border-default: var(--neutral-200);
+  --border-strong: var(--neutral-300);
+  --border-interactive: var(--accent-300);
+
+  --text-body: var(--neutral-900);
+  --text-muted: var(--neutral-600);
+  --text-subtle: var(--neutral-500);
+  --text-on-accent: hsl(0, 0%, 100%);
+
+  /* Spacing rhythm - 4px base unit */
+  --space-1: 0.25rem;   /* 4px */
+  --space-2: 0.5rem;    /* 8px */
+  --space-3: 0.75rem;   /* 12px */
+  --space-4: 1rem;      /* 16px */
+  --space-5: 1.25rem;   /* 20px */
+  --space-6: 1.5rem;    /* 24px */
+  --space-8: 2rem;      /* 32px */
+  --space-10: 2.5rem;   /* 40px */
+  --space-12: 3rem;     /* 48px */
+  --space-16: 4rem;     /* 64px */
+
+  /* Border radius */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+
+  /* Elevation - soft shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 2px 4px -1px rgb(0 0 0 / 0.07), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+  --shadow-lg: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-xl: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.08);
+
+  /* Animation */
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --duration-slow: 240ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+  --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* Dark mode tokens - adjusted chroma and lightness */
+[data-md-color-scheme="slate"] {
+  --neutral-50: hsl(220, 18%, 12%);
+  --neutral-100: hsl(220, 16%, 16%);
+  --neutral-200: hsl(220, 14%, 22%);
+  --neutral-300: hsl(220, 12%, 30%);
+  --neutral-400: hsl(220, 10%, 45%);
+  --neutral-500: hsl(220, 8%, 60%);
+  --neutral-600: hsl(220, 10%, 75%);
+  --neutral-700: hsl(220, 12%, 85%);
+  --neutral-800: hsl(220, 14%, 92%);
+  --neutral-900: hsl(220, 16%, 96%);
+
+  --accent-500: hsl(231, 65%, 65%);
+  --accent-600: hsl(231, 68%, 72%);
+
+  --success: hsl(142, 71%, 55%);
+  --success-bg: hsl(142, 76%, 12%);
+  --warning: hsl(38, 92%, 60%);
+  --warning-bg: hsl(38, 100%, 12%);
+  --danger: hsl(0, 84%, 70%);
+  --danger-bg: hsl(0, 100%, 12%);
+  --info: hsl(199, 89%, 58%);
+  --info-bg: hsl(199, 100%, 12%);
+
+  --surface-base: hsl(220, 18%, 11%);
+  --surface-raised: hsl(220, 16%, 14%);
+  --surface-overlay: hsl(220, 16%, 16%);
+
+  --border-default: var(--neutral-200);
+  --border-strong: var(--neutral-300);
+  --border-interactive: var(--accent-500);
+
+  --text-body: var(--neutral-900);
+  --text-muted: hsl(220, 16%, 14%);
+  --surface-overlay: hsl(220, 16%, 16%);
+
+  --border-default: var(--neutral-200);
+  --border-strong: var(--neutral-300);
+  --border-interactive: var(--accent-500);
+
+  --text-body: var(--neutral-900);
+  --text-muted: var(--neutral-600);
+  --text-subtle: var(--neutral-500);
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  --shadow-xl: 0 10px 15px -3px rgb(0 0 0 / 0.6), 0 4px 6px -4px rgb(0 0 0 / 0.5);
+}
+
+/* ==========================================================================
+   Typography
+   ========================================================================== */
+
+.md-typeset {
+  /* Improved measure for readability */
+  --md-typeset-max-width: 68ch;
+
+  /* Refined line heights */
+  line-height: 1.65;
+}
+
+.md-typeset h1 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin-bottom: var(--space-6);
+}
+
+.md-typeset h2 {
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  margin-top: var(--space-12);
+  margin-bottom: var(--space-4);
+}
+
+.md-typeset h3 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+  margin-top: var(--space-8);
+  margin-bottom: var(--space-3);
+}
+
+.md-typeset h4 {
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: var(--space-6);
+  margin-bottom: var(--space-2);
+}
+
+/* Tabular numerals for aligned numbers in tables and code */
+.md-typeset table,
+.md-typeset pre,
+.md-typeset code {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   Code Blocks
+   ========================================================================== */
+
+.md-typeset code {
+  background-color: var(--neutral-100);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 0.125em 0.375em;
+  font-size: 0.875em;
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.md-typeset pre {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.md-typeset pre > code {
+  background-color: transparent;
+  border: none;
+  padding: 0;
+  font-size: 0.85em;
+  line-height: 1.6;
+  font-weight: 400;
+}
+
+/* Code block title bar enhancement */
+.md-typeset .highlight .filename {
+  background-color: var(--neutral-100);
+  border-bottom: 1px solid var(--border-default);
+  padding: var(--space-2) var(--space-4);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* Copy button refinement */
+.md-clipboard {
+  transition: opacity var(--duration-base) var(--ease-standard);
+}
+
+.md-clipboard:hover {
+  opacity: 1;
+}
+
+.md-clipboard:focus-visible {
+  outline: 2px solid var(--border-interactive);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Line numbers */
+.md-typeset .highlight [data-linenos]::before {
+  color: var(--text-subtle);
+  margin-right: var(--space-4);
+}
+
+/* ==========================================================================
+   Tables
+   ========================================================================== */
+
+.md-typeset table:not([class]) {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  font-size: 0.875rem;
+  display: table;
+  width: 100%;
+  overflow: hidden;
+}
+
+.md-typeset table:not([class]) thead {
+  background-color: var(--surface-raised);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.md-typeset table:not([class]) th {
+  font-weight: 600;
+  text-align: left;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 2px solid var(--border-strong);
+  color: var(--text-body);
+}
+
+.md-typeset table:not([class]) td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-default);
+  vertical-align: top;
+}
+
+.md-typeset table:not([class]) tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.md-typeset table:not([class]) tbody tr:hover {
+  background-color: var(--surface-raised);
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+/* Numeric column alignment */
+.md-typeset table:not([class]) td:last-child,
+.md-typeset table:not([class]) th:last-child {
+  text-align: right;
+}
+
+/* Responsive table wrapper */
+.md-typeset__table {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: var(--space-6) 0;
+}
+
+/* ==========================================================================
+   Admonitions
+   ========================================================================== */
+
+.md-typeset .admonition {
+  border: 1px solid var(--border-default);
+  border-left-width: 4px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  margin: var(--space-6) 0;
+  padding: var(--space-4) var(--space-5);
+}
+
+.md-typeset .admonition-title {
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.md-typeset .admonition-title::before {
+  flex-shrink: 0;
+}
+
+/* Infrastructure-specific admonition types */
+.md-typeset .admonition.note {
+  border-left-color: var(--info);
+  background-color: var(--info-bg);
+}
+
+.md-typeset .admonition.warning {
+  border-left-color: var(--warning);
+  background-color: var(--warning-bg);
+}
+
+.md-typeset .admonition.danger {
+  border-left-color: var(--danger);
+  background-color: var(--danger-bg);
+}
+
+.md-typeset .admonition.success,
+.md-typeset .admonition.tip {
+  border-left-color: var(--success);
+  background-color: var(--success-bg);
+}
+
+/* ==========================================================================
+   Navigation Enhancements
+   ========================================================================== */
+
+.md-tabs {
+  border-bottom: 1px solid var(--border-default);
+}
+
+.md-tabs__link {
+  transition: color var(--duration-base) var(--ease-standard),
+              opacity var(--duration-base) var(--ease-standard);
+}
+
+.md-tabs__link:focus-visible {
+  outline: 2px solid var(--border-interactive);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+
+.md
+-nav__link {
+  border-radius: var(--radius-sm);
+  transition: background-color var(--duration-fast) var(--ease-standard),
+              color var(--duration-fast) var(--ease-standard);
+}
+
+.md-nav__link:focus-visible {
+  outline: 2px solid var(--border-interactive);
+  outline-offset: 1px;
+}
+
+.md-nav__link--active {
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   Content Tabs (Multi-language / Multi-tool selectors)
+   ========================================================================== */
+
+.md-typeset .tabbed-set {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  margin: var(--space-6) 0;
+}
+
+.md-typeset .tabbed-labels {
+  background-color: var(--surface-raised);
+  border-bottom: 1px solid var(--border-default);
+  padding: 0 var(--space-2);
+  gap: var(--space-1);
+}
+
+.md-typeset .tabbed-labels > label {
+  border-bottom: 2px solid transparent;
+  padding: var(--space-3) var(--space-4);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  transition: color var(--duration-fast) var(--ease-standard),
+              border-color var(--duration-fast) var(--ease-standard);
+  cursor: pointer;
+}
+
+.md-typeset .tabbed-labels > label:hover {
+  color: var(--text-body);
+}
+
+.md-typeset .tabbed-labels > label:focus-visible {
+  outline: 2px solid var(--border-interactive);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+
+.md-typeset .tabbed-content > .tabbed-block {
+  padding: 0;
+}
+
+.md-typeset .tabbed-content > .tabbed-block > .highlight {
+  margin: 0;
+}
+
+.md-typeset .tabbed-content > .tabbed-block > .highlight pre {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Tab selector indicators for OS / Tooling */
+.md-typeset .tabbed-labels > label[for*="bash"]::before,
+.md-typeset .tabbed-labels > label[for*="sh"]::before,
+.md-typeset .tabbed-labels > label[for*="posix"]::before {
+  content: "$ ";
+  color: var(--accent-500);
+  font-family: var(--md-code-font-family);
+  font-weight: 700;
+}
+
+.md-typeset .tabbed-labels > label[for*="powershell"]::before,
+.md-typeset .tabbed-labels > label[for*="ps1"]::before,
+.md-typeset .tabbed-labels > label[for*="windows"]::before {
+  content: "PS> ";
+  color: var(--accent-500);
+  font-family: var(--md-code-font-family);
+  font-weight: 700;
+}
+
+.md-typeset .tabbed-labels > label[for*="terragrunt"]::before,
+.md-typeset .tabbed-labels > label[for*="hcl"]::before {
+  content: "# ";
+  color: var(--accent-500);
+  font-family: var(--md-code-font-family);
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   Mermaid Diagrams & Architecture Visualizations
+   ========================================================================== */
+
+.md-typeset .mermaid {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-6);
+  margin: var(--space-6) 0;
+  overflow-x: auto;
+}
+
+.md-typeset .mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ==========================================================================
+   Tags & Badges (Catalog & Inventory metadata)
+   ========================================================================== */
+
+.md-typeset .md-tag {
+  background-color: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full, 9999px);
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  line-height: 1.2;
+  vertical-align: middle;
+  transition: border-color var(--duration-fast) var(--ease-standard),
+              color var(--duration-fast) var(--ease-standard),
+              background-color var(--duration-fast) var(--ease-standard);
+}
+
+.md-typeset .md-tag:hover {
+  border-color: var(--border-interactive);
+  color: var(--text-body);
+  background-color: var(--surface-base);
+}
+
+/* Environment Badges */
+.md-tag[href*="aws"],
+.md-tag[href*="terraform"],
+.md-tag[href*="terragrunt"] {
+  border-color: var(--accent-300);
+  color: var(--accent-600);
+}
+
+.md-tag[href*="security"] {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.md-tag[href*="foundation"] {
+  border-color: var(--info);
+  color: var(--info);
+}
+
+.md-tag[href*="workloads"] {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+/* ==========================================================================
+   Task Lists & Checklist (Smoke Tests / Baseline)
+   ========================================================================== */
+
+.md-typeset .task-list-item {
+  padding-left: var(--space-6);
+  margin-bottom: var(--space-2);
+}
+
+.md-typeset .task-list-control {
+  margin-left: calc(-1 * var(--space-6));
+  margin-right: var(--space-2);
+}
+
+.md-typeset .task-list-control input[type="checkbox"] {
+  accent-color: var(--accent-500);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   Header & Search Refinements
+   ========================================================================== */
+
+.md-header {
+  border-bottom: 1px solid var(--border-default);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.md-search__inner {
+  border-radius: var(--radius-md);
+}
+
+.md-search__input {
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+}
+
+.md-search-result__meta {
+  background-color: var(--surface-raised);
+  color: var(--text-muted);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border-default);
+}
+
+/* ==========================================================================
+   Footer & Meta Details
+   ========================================================================== */
+
+.md-footer-meta {
+  border-top: 1px solid var(--border-default);
+  background-color: var(--surface-raised);
+}
+
+.md-source-date {
+  color: var(--text-subtle);
+  font-size: 0.75rem;
+}
+
+/* ==========================================================================
+   Print Optimization
+   ========================================================================== */
+
+@media print {
+  :root {
+    --border-default: #d1d5db;
+    --text-body: #000000;
+    --text-muted: #4b5563;
+  }
+
+  .md-header,
+  .md-tabs,
+  .md-sidebar,
+  .md-footer,
+  .md-clipboard,
+  .md-content__button {
+    display: none !important;
+  }
+
+  .md-main__inner {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .md-typeset pre,
+  .md-typeset table:not([class]),
+  .md-typeset .admonition {
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  .md-typeset a {
+    color: inherit !important;
+    text-decoration: underline;
+  }
+}
+
+/* ==========================================================================
+   Reduced Motion
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
