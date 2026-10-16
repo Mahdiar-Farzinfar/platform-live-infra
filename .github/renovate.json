@@ -1,0 +1,406 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Renovate configuration for platform-live-infra - Enterprise-grade IaC dependency management",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":separateMajorReleases",
+    ":combinePatchMinorReleases",
+    ":ignoreModulesAndTests",
+    ":autodetectPinVersions",
+    ":prHourlyLimit4",
+    ":prConcurrentLimit10",
+    "group:allNonMajor",
+    "workarounds:all"
+  ],
+  "pinDigests": true,
+  "timezone": "UTC",
+  "schedule": [
+    "after 10pm every weekday",
+    "before 5am every weekday",
+    "every weekend"
+  ],
+  "labels": [
+    "dependencies",
+    "renovate"
+  ],
+  "assignees": [],
+  "reviewers": [],
+  "prCreation": "not-pending",
+  "prConcurrentLimit": 10,
+  "prHourlyLimit": 4,
+  "rebaseWhen": "behind-base-branch",
+  "semanticCommits": "enabled",
+  "commitMessagePrefix": "chore(deps):",
+  "commitMessageAction": "update",
+  "commitMessageTopic": "{{depName}}",
+  "commitMessageExtra": "to {{#if isPinDigest}}{{{newDigestShort}}}{{else}}{{#if isMajor}}{{prettyNewMajor}}{{else}}{{#if isSingleVersion}}{{prettyNewVersion}}{{else}}{{#if newValue}}{{{newValue}}}{{else}}{{{newDigestShort}}}{{/if}}{{/if}}{{/if}}{{/if}}",
+  "dependencyDashboard": true,
+  "dependencyDashboardTitle": "🤖 Dependency Updates Dashboard",
+  "dependencyDashboardHeader": "This dashboard provides an overview of all pending dependency updates. Check the status and merge when ready.",
+  "dependencyDashboardFooter": "✨ Powered by Renovate Bot",
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": [
+      "security",
+      "priority:high"
+    ],
+    "assignees": [],
+    "reviewers": [],
+    "schedule": [
+      "at any time"
+    ],
+    "commitMessageSuffix": "[SECURITY]"
+  },
+  "separateMinorPatch": false,
+  "separateMajorMinor": true,
+  "separateMultipleMajor": true,
+  "minimumReleaseAge": "3 days",
+  "internalChecksFilter": "strict",
+  "stabilityDays": 3,
+  "packageRules": [
+    {
+      "description": "Terraform providers - group patch and minor updates",
+      "matchDatasources": [
+        "terraform-provider"
+      ],
+      "groupName": "Terraform providers",
+      "labels": [
+        "terraform",
+        "providers"
+      ],
+      "schedule": [
+        "after 10pm on sunday"
+      ],
+      "stabilityDays": 7,
+      "rangeStrategy": "bump"
+    },
+    {
+      "description": "Terraform modules - require manual review",
+      "matchDatasources": [
+        "terraform-module"
+      ],
+      "groupName": "Terraform modules",
+      "labels": [
+        "terraform",
+        "modules"
+      ],
+      "schedule": [
+        "after 10pm on sunday"
+      ],
+      "stabilityDays": 7,
+      "rangeStrategy": "bump",
+      "automerge": false
+    },
+    {
+      "description": "HashiCorp tools (Terraform, Terragrunt) - critical updates only",
+      "matchPackageNames": [
+        "hashicorp/terraform",
+        "terraform",
+        "terragrunt"
+      ],
+      "labels": [
+        "terraform",
+        "critical"
+      ],
+      "schedule": [
+        "after 10pm on sunday"
+      ],
+      "stabilityDays": 14,
+      "automerge": false,
+      "prPriority": 10
+    },
+    {
+      "description": "GitHub Actions - auto-merge patch updates",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "GitHub Actions",
+      "labels": [
+        "github-actions",
+        "ci"
+      ],
+      "stabilityDays": 3,
+      "automerge": true,
+      "automergeType": "pr",
+      "matchUpdateTypes": [
+        "patch",
+        "digest"
+      ]
+    },
+    {
+      "description": "GitHub Actions - major/minor require review",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor"
+      ],
+      "labels": [
+        "github-actions",
+        "ci"
+      ],
+      "stabilityDays": 7,
+      "automerge": false
+    },
+    {
+      "description": "Go dependencies",
+      "matchManagers": [
+        "gomod"
+      ],
+      "groupName": "Go dependencies",
+      "labels": [
+        "golang",
+        "dependencies"
+      ],
+      "postUpdateOptions": [
+        "gomodTidy",
+        "gomodUpdateImportPaths"
+      ],
+      "stabilityDays": 3
+    },
+    {
+      "description": "Python dependencies",
+      "matchManagers": [
+        "pip_requirements",
+        "pip_setup"
+      ],
+      "groupName": "Python dependencies",
+      "labels": [
+        "python",
+        "dependencies"
+      ],
+      "stabilityDays": 3
+    },
+    {
+      "description": "Pre-commit hooks",
+      "matchManagers": [
+        "pre-commit"
+      ],
+      "groupName": "pre-commit hooks",
+      "labels": [
+        "pre-commit",
+        "tooling"
+      ],
+      "schedule": [
+        "after 10pm every weekday"
+      ],
+      "automerge": true,
+      "automergeType": "pr",
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ]
+    },
+    {
+      "description": "Docker images in devcontainer",
+      "matchManagers": [
+        "dockerfile",
+        "docker-compose"
+      ],
+      "matchPaths": [
+        ".devcontainer/**"
+      ],
+      "groupName": "devcontainer images",
+      "labels": [
+        "docker",
+        "devcontainer"
+      ],
+      "stabilityDays": 5
+    },
+    {
+      "description": "Major updates - require manual review and testing",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "labels": [
+        "major-update",
+        "requires-testing"
+      ],
+      "stabilityDays": 14,
+      "automerge": false,
+      "prPriority": 5
+    },
+    {
+      "description": "Minor updates - conservative auto-merge after stability period",
+      "matchUpdateTypes": [
+        "minor"
+      ],
+      "stabilityDays": 5,
+      "automerge": false
+    },
+    {
+      "description": "Patch updates - auto-merge after short stability period",
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "stabilityDays": 3,
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Pin digests for container images",
+      "matchUpdateTypes": [
+        "digest",
+        "pin"
+      ],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Security updates - highest priority, immediate creation",
+      "matchUpdateTypes": [
+        "pin"
+      ],
+      "matchPackagePatterns": [
+        "*"
+      ],
+      "vulnerabilityAlerts": {
+        "enabled": true
+      },
+      "labels": [
+        "security",
+        "priority:critical"
+      ],
+      "schedule": [
+        "at any time"
+      ],
+      "stabilityDays": 0,
+      "prPriority": 100,
+      "automerge": false
+    },
+    {
+      "description": "AWS provider - careful updates due to breaking changes",
+      "matchPackageNames": [
+        "hashicorp/aws"
+      ],
+      "labels": [
+        "terraform",
+        "aws-provider",
+        "requires-testing"
+      ],
+      "stabilityDays": 14,
+      "automerge": false,
+      "prPriority": 8
+    },
+    {
+      "description": "MkDocs and documentation tools",
+      "matchPackageNames": [
+        "mkdocs",
+        "mkdocs-material"
+      ],
+      "matchPaths": [
+        "docs/**"
+      ],
+      "groupName": "documentation tools",
+      "labels": [
+        "documentation"
+      ],
+      "automerge": true,
+      "automergeType": "pr",
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ]
+    }
+  ],
+  "regexManagers": [
+    {
+      "description": "Update module versions and digests in live catalog",
+      "fileMatch": [
+        "(^|/)live/catalogs/module-versions\\.hcl$"
+      ],
+      "matchStrings": [
+        "(?<moduleName>[a-z0-9-]+)\\s*=\\s*\\{[\\s\\S]*?version\\s*=\\s*\"(?<currentPrefix>[a-z0-9-]+/v)(?<currentValue>[^\"\\s]+)\"[\\s\\S]*?digest\\s*=\\s*\"(?<currentDigest>[^\"]+)\""
+      ],
+      "datasourceTemplate": "github-tags",
+      "depNameTemplate": "Mahdiar-Farzinfar/platform-iac-modules",
+      "versioningTemplate": "semver",
+      "extractVersionTemplate": "^{{{currentPrefix}}}(?<version>.+)$"
+    },
+    {
+      "description": "Update Terraform version in .terraform-version file",
+      "fileMatch": [
+        "(^|/)\\.terraform-version$"
+      ],
+      "matchStrings": [
+        "(?<currentValue>.*)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "hashicorp/terraform",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "description": "Update Terragrunt version in .terragrunt-version file",
+      "fileMatch": [
+        "(^|/)\\.terragrunt-version$"
+      ],
+      "matchStrings": [
+        "(?<currentValue>.*)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "gruntwork-io/terragrunt",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "description": "Update tool versions in scripts and documentation",
+      "fileMatch": [
+        "^scripts/.+\\.(sh|ps1|py)$",
+        "^docs/.+\\.md$"
+      ],
+      "matchStrings": [
+        "TERRAFORM_VERSION=[\"']?(?<currentValue>[^\"'\\s]+)[\"']?",
+        "TERRAGRUNT_VERSION=[\"']?(?<currentValue>[^\"'\\s]+)[\"']?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "hashicorp/terraform",
+      "extractVersionTemplate": "^v?(?<version>.*)$"
+    }
+  ],
+  "terraform": {
+    "enabled": true,
+    "ignorePaths": [
+      "**/tests/**",
+      "**/test/**"
+    ]
+  },
+  "terragrunt": {
+    "enabled": true
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 5am on monday"
+    ],
+    "commitMessageAction": "refresh",
+    "prPriority": -5
+  },
+  "postUpdateOptions": [
+    "gomodTidy"
+  ],
+  "ignoreDeps": [],
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/bower_components/**",
+    "**/vendor/**",
+    "**/__pycache__/**",
+    "**/.terraform/**",
+    "**/.terragrunt-cache/**"
+  ],
+  "enabledManagers": [
+    "terraform",
+    "terragrunt",
+    "github-actions",
+    "gomod",
+    "pip_requirements",
+    "pip_setup",
+    "pre-commit",
+    "dockerfile",
+    "docker-compose",
+    "regex"
+  ],
+  "osvVulnerabilityAlerts": true,
+  "transitiveRemediation": true
+}
