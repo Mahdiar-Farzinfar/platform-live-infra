@@ -1,0 +1,263 @@
+# ============================================================================
+#  CODEOWNERS — platform-live-infra
+# ============================================================================
+#  Syntax: gitignore-style patterns. LAST matching rule wins.
+#  Therefore rules are ordered from most generic to most specific.
+#
+#  Rules of engagement for this repository:
+#    * Every path MUST resolve to at least one owner (no orphan paths).
+#    * Owners listed here must retain write access, otherwise GitHub
+#      silently drops the rule. Validate with:
+#          gh api repos/Mahdiar-Farzinfar/platform-live-infra/codeowners/errors
+#    * Do NOT add a second CODEOWNERS under .github/ or docs/ — GitHub
+#      resolves .github/ > root > docs/ and uses only the first file found.
+#    * Negation patterns (!) are NOT supported by CODEOWNERS.
+#
+#  Current state: single maintainer. Team handles below are intentionally
+#  commented out until additional maintainers are onboarded; uncommenting a
+#  handle that does not exist invalidates the whole file.
+# ============================================================================
+
+
+# ---------------------------------------------------------------------------
+# 0. Default owner — catch-all safety net for anything not matched below
+# ---------------------------------------------------------------------------
+*                                                           @Mahdiar-Farzinfar
+
+
+# ---------------------------------------------------------------------------
+# 1. Cross-cutting file types (broad; intentionally placed before path rules)
+# ---------------------------------------------------------------------------
+*.hcl                                                       @Mahdiar-Farzinfar
+*.tf                                                        @Mahdiar-Farzinfar
+*.tfvars                                                    @Mahdiar-Farzinfar
+*.json                                                      @Mahdiar-Farzinfar
+*.yml                                                       @Mahdiar-Farzinfar
+*.yaml                                                      @Mahdiar-Farzinfar
+*.md                                                        @Mahdiar-Farzinfar
+*.sh                                                        @Mahdiar-Farzinfar
+*.ps1                                                       @Mahdiar-Farzinfar
+*.py                                                        @Mahdiar-Farzinfar
+*.go                                                        @Mahdiar-Farzinfar
+
+
+# ---------------------------------------------------------------------------
+# 2. Repository governance & meta
+#    Changes here affect contribution rules, licensing and disclosure policy.
+# ---------------------------------------------------------------------------
+/README.md                                                  @Mahdiar-Farzinfar
+/CONTRIBUTING.md                                            @Mahdiar-Farzinfar
+/CODE_OF_CONDUCT.md                                         @Mahdiar-Farzinfar
+/CHANGELOG.md                                               @Mahdiar-Farzinfar
+/LICENSE                                                    @Mahdiar-Farzinfar
+/.gitignore                                                 @Mahdiar-Farzinfar
+/.gitattributes                                             @Mahdiar-Farzinfar
+/.editorconfig                                              @Mahdiar-Farzinfar
+/.terraformignore                                           @Mahdiar-Farzinfar
+
+# Security policy and the ownership map itself are self-guarded.
+/SECURITY.md                                                @Mahdiar-Farzinfar
+/CODEOWNERS                                                 @Mahdiar-Farzinfar
+# Future: /CODEOWNERS                                       @Mahdiar-Farzinfar @<org>/platform-leads
+
+
+# ---------------------------------------------------------------------------
+# 3. Developer experience: task runners, local stack, containers, editor
+# ---------------------------------------------------------------------------
+/Makefile                                                   @Mahdiar-Farzinfar
+/Taskfile.yml                                               @Mahdiar-Farzinfar
+/justfile                                                   @Mahdiar-Farzinfar
+/go.mod                                                     @Mahdiar-Farzinfar
+/docker-compose.dev.yml                                     @Mahdiar-Farzinfar
+/.pre-commit-config.yaml                                    @Mahdiar-Farzinfar
+/.devcontainer/                                             @Mahdiar-Farzinfar
+/.vscode/                                                   @Mahdiar-Farzinfar
+
+
+# ---------------------------------------------------------------------------
+# 4. CI/CD — supply-chain sensitive
+#    Workflows hold OIDC role assumptions and apply privileges; treat every
+#    change here as a privilege change, not a config tweak.
+# ---------------------------------------------------------------------------
+/.github/                                                   @Mahdiar-Farzinfar
+/.github/PULL_REQUEST_TEMPLATE.md                           @Mahdiar-Farzinfar
+/.github/renovate.json                                      @Mahdiar-Farzinfar
+/.github/workflows/                                         @Mahdiar-Farzinfar
+
+# Highest-risk pipelines: mutate real infrastructure or publish artifacts.
+/.github/workflows/apply.yml                                @Mahdiar-Farzinfar
+/.github/workflows/plan.yml                                 @Mahdiar-Farzinfar
+/.github/workflows/release.yml                              @Mahdiar-Farzinfar
+/.github/workflows/security-scan.yml                        @Mahdiar-Farzinfar
+/.github/workflows/scorecard.yml                            @Mahdiar-Farzinfar
+/.github/workflows/drift-detection.yml                      @Mahdiar-Farzinfar
+/.github/workflows/post-apply-verify.yml                    @Mahdiar-Farzinfar
+/.github/workflows/devcontainer-image.yml                   @Mahdiar-Farzinfar
+/.github/workflows/cross-platform-test.yml                  @Mahdiar-Farzinfar
+/.github/workflows/validate.yml                             @Mahdiar-Farzinfar
+/.github/workflows/docs.yml                                 @Mahdiar-Farzinfar
+# Future: /.github/workflows/apply.yml                      @Mahdiar-Farzinfar @<org>/platform-security
+
+
+# ---------------------------------------------------------------------------
+# 5. Documentation (MkDocs site)
+# ---------------------------------------------------------------------------
+/mkdocs.yml                                                 @Mahdiar-Farzinfar
+/docs/                                                      @Mahdiar-Farzinfar
+/docs/requirements.txt                                      @Mahdiar-Farzinfar
+/docs/stylesheets/                                          @Mahdiar-Farzinfar
+
+# Runbook-grade docs: must stay in sync with the code that implements them.
+/docs/bootstrap.md                                          @Mahdiar-Farzinfar
+/docs/state-management.md                                   @Mahdiar-Farzinfar
+/docs/deployment-order.md                                   @Mahdiar-Farzinfar
+/docs/operations.md                                         @Mahdiar-Farzinfar
+/docs/cross-platform.md                                     @Mahdiar-Farzinfar
+
+
+# ---------------------------------------------------------------------------
+# 6. Organization-wide guardrails (SCPs)
+#    A bad merge here can lock out an entire AWS Organization. Never
+#    auto-merge; Renovate must not be an owner of this path.
+# ---------------------------------------------------------------------------
+/policies/                                                  @Mahdiar-Farzinfar
+/policies/scp/                                              @Mahdiar-Farzinfar
+/policies/scp/deny-create-iam-user.json                     @Mahdiar-Farzinfar
+/policies/scp/deny-disable-cloudtrail.json                  @Mahdiar-Farzinfar
+/policies/scp/restrict-regions.json                         @Mahdiar-Farzinfar
+# Future: /policies/scp/                                    @Mahdiar-Farzinfar @<org>/platform-security
+
+
+# ---------------------------------------------------------------------------
+# 7. Automation scripts
+# ---------------------------------------------------------------------------
+/scripts/                                                   @Mahdiar-Farzinfar
+/scripts/tools/                                             @Mahdiar-Farzinfar
+/scripts/cross-platform/                                    @Mahdiar-Farzinfar
+
+# CI helpers decide *what gets planned and applied*; changes affect blast radius.
+/scripts/ci/                                                @Mahdiar-Farzinfar
+/scripts/ci/detect-changed-stacks.go                        @Mahdiar-Farzinfar
+/scripts/ci/build-plan-matrix.py                            @Mahdiar-Farzinfar
+
+# Bootstrap creates the state backend and core resources.
+/scripts/bootstrap/                                         @Mahdiar-Farzinfar
+
+
+# ---------------------------------------------------------------------------
+# 8. Toolchain configuration & version pinning
+#    Pin bumps change plan output across every stack — review as infra change.
+# ---------------------------------------------------------------------------
+/tooling/                                                   @Mahdiar-Farzinfar
+/tooling/.tflint.hcl                                        @Mahdiar-Farzinfar
+/tooling/.yamllint.yml                                      @Mahdiar-Farzinfar
+/tooling/.markdownlint-cli2.yaml                            @Mahdiar-Farzinfar
+/tooling/cross-platform/                                    @Mahdiar-Farzinfar
+
+/tooling/.terraform-version                                 @Mahdiar-Farzinfar
+/tooling/.terragrunt-version                                @Mahdiar-Farzinfar
+/tooling/.tool-versions                                     @Mahdiar-Farzinfar
+/tooling/cross-platform/asdf-tool-versions                  @Mahdiar-Farzinfar
+
+# Security scanner config: suppressions must be justified in the PR.
+/tooling/.checkov.yml                                       @Mahdiar-Farzinfar
+/tooling/.trivyignore                                       @Mahdiar-Farzinfar
+
+
+# ---------------------------------------------------------------------------
+# 9. Live Terragrunt layer — Root & Shared Configurations
+#    Global definitions consumed by every child terragrunt.hcl file.
+# ---------------------------------------------------------------------------
+/live/                                                      @Mahdiar-Farzinfar
+/live/README.md                                             @Mahdiar-Farzinfar
+/live/terragrunt.hcl                                        @Mahdiar-Farzinfar
+/live/common.hcl                                            @Mahdiar-Farzinfar
+
+# Global catalogs: account IDs, approved regions, tags, module versions
+/live/catalogs/                                             @Mahdiar-Farzinfar
+/live/catalogs/accounts.hcl                                 @Mahdiar-Farzinfar
+/live/catalogs/regions.hcl                                  @Mahdiar-Farzinfar
+/live/catalogs/tags.hcl                                     @Mahdiar-Farzinfar
+/live/catalogs/module-versions.hcl                          @Mahdiar-Farzinfar
+
+# Environment commons: remote backend, provider configs, unified tagging
+/live/_envcommon/                                           @Mahdiar-Farzinfar
+/live/_envcommon/provider.hcl                               @Mahdiar-Farzinfar
+/live/_envcommon/remote-state.hcl                           @Mahdiar-Farzinfar
+/live/_envcommon/tagging.hcl                                @Mahdiar-Farzinfar
+
+
+# ---------------------------------------------------------------------------
+# 10. Live Terragrunt layer — Bootstrap
+#     One-time provisioning of S3 backend buckets and DynamoDB lock tables.
+# ---------------------------------------------------------------------------
+/live/bootstrap/                                            @Mahdiar-Farzinfar
+/live/bootstrap/backend-bootstrap/                          @Mahdiar-Farzinfar
+
+
+# ---------------------------------------------------------------------------
+# 11. Live Terragrunt layer — Foundation Accounts
+#     Core Landing Zone infrastructure across dedicated AWS accounts.
+# ---------------------------------------------------------------------------
+/live/foundation/                                           @Mahdiar-Farzinfar
+
+# Management (payer) account: Org SCPs, GitHub Actions OIDC federation
+/live/foundation/management/                                @Mahdiar-Farzinfar
+/live/foundation/management/account.hcl                     @Mahdiar-Farzinfar
+/live/foundation/management/us-east-1/region.hcl            @Mahdiar-Farzinfar
+/live/foundation/management/us-east-1/github-oidc/          @Mahdiar-Farzinfar
+/live/foundation/management/us-east-1/scp/                  @Mahdiar-Farzinfar
+# Future: /live/foundation/management/                      @Mahdiar-Farzinfar @<org>/platform-leads
+
+# Log Archive account: centralized immutable S3 bucket and CMKs
+/live/foundation/log-archive/                               @Mahdiar-Farzinfar
+/live/foundation/log-archive/account.hcl                    @Mahdiar-Farzinfar
+/live/foundation/log-archive/us-east-1/region.hcl           @Mahdiar-Farzinfar
+/live/foundation/log-archive/us-east-1/kms/                 @Mahdiar-Farzinfar
+/live/foundation/log-archive/us-east-1/log-archive-bucket/  @Mahdiar-Farzinfar
+# Future: /live/foundation/log-archive/                     @Mahdiar-Farzinfar @<org>/platform-security
+
+# Security tooling account: Org-wide CloudTrail, GuardDuty detector
+/live/foundation/security/                                  @Mahdiar-Farzinfar
+/live/foundation/security/account.hcl                       @Mahdiar-Farzinfar
+/live/foundation/security/us-east-1/region.hcl              @Mahdiar-Farzinfar
+/live/foundation/security/us-east-1/cloudtrail/             @Mahdiar-Farzinfar
+/live/foundation/security/us-east-1/guardduty/              @Mahdiar-Farzinfar
+# Future: /live/foundation/security/                        @Mahdiar-Farzinfar @<org>/platform-security
+
+
+# ---------------------------------------------------------------------------
+# 12. Live Terragrunt layer — Workload Accounts
+#     Environment-specific workload accounts and account-level baselines.
+# ---------------------------------------------------------------------------
+/live/workloads/                                            @Mahdiar-Farzinfar
+/live/workloads/README.md                                   @Mahdiar-Farzinfar
+/live/workloads/sandbox-account/                            @Mahdiar-Farzinfar
+/live/workloads/sandbox-account/account.hcl                 @Mahdiar-Farzinfar
+/live/workloads/sandbox-account/us-east-1/region.hcl        @Mahdiar-Farzinfar
+/live/workloads/sandbox-account/us-east-1/scp-attachments/  @Mahdiar-Farzinfar
+/live/workloads/sandbox-account/us-east-1/security-baseline/ @Mahdiar-Farzinfar
+/live/workloads/sandbox-account/us-east-1/test-iam-roles/   @Mahdiar-Farzinfar
+# Future: /live/workloads/sandbox-account/                  @Mahdiar-Farzinfar @<org>/sandbox-users
+
+
+# ---------------------------------------------------------------------------
+# 13. Verification, Smoke Tests & Invariant Assertions
+# ---------------------------------------------------------------------------
+/tests/                                                     @Mahdiar-Farzinfar
+/tests/README.md                                            @Mahdiar-Farzinfar
+/tests/smoke/                                               @Mahdiar-Farzinfar
+/tests/smoke/security-baseline-checklist.md                 @Mahdiar-Farzinfar
+/tests/smoke/verify-security-baseline.ps1                   @Mahdiar-Farzinfar
+/tests/smoke/verify-security-baseline.sh                    @Mahdiar-Farzinfar
+/tests/smoke/verify-security-baseline.py                    @Mahdiar-Farzinfar
+
+
+# ---------------------------------------------------------------------------
+# 14. Inventory & Orchestration Metadata
+#     Stack ownership mapping and multi-account deployment DAG sequence.
+# ---------------------------------------------------------------------------
+/inventory/                                                 @Mahdiar-Farzinfar
+/inventory/stack-owners.yaml                                @Mahdiar-Farzinfar
+/inventory/deployment-order.yaml                            @Mahdiar-Farzinfar
+# Future: /inventory/                                       @Mahdiar-Farzinfar @<org>/platform-architects
