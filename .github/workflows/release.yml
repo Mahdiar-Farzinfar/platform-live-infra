@@ -363,6 +363,39 @@ jobs:
         with:
           name: release-plan-${{ github.run_id }}
           path: ${{ runner.temp }}/release-plan
+      - name: Import and verify the release signing identity
+        env:
+          SIGNING_KEY: ${{ secrets.RELEASE_GPG_PRIVATE_KEY }}
+          SIGNING_PASSPHRASE: ${{ secrets.RELEASE_GPG_PASSPHRASE }}
+          SIGNING_FINGERPRINT: ${{ vars.RELEASE_GPG_FINGERPRINT }}
+          SIGNER_NAME: ${{ vars.RELEASE_GPG_SIGNER_NAME }}
+          SIGNER_EMAIL: ${{ vars.RELEASE_GPG_SIGNER_EMAIL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          signer_name_pattern='^[A-Za-z0-9._ -]+$'
+          [[ -n "$SIGNING_KEY" && -n "$SIGNING_PASSPHRASE" && "$SIGNING_FINGERPRINT" =~ ^[0-9A-F]{40}$ &&
+             "$SIGNER_NAME" =~ $signer_name_pattern && "$SIGNER_EMAIL" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$ ]] || {
+            echo 'Configure the GPG signing key, passphrase, fingerprint and signer identity.' >&2
+            exit 1
+          }
+          mkdir -m 700 "$RUNNER_TEMP/release-gnupg"
+          export GNUPGHOME="$RUNNER_TEMP/release-gnupg"
+          printf '%s' "$SIGNING_KEY" | gpg --batch --quiet --import
+          actual="$(gpg --batch --with-colons --list-secret-keys "$SIGNING_FINGERPRINT" | awk -F: '$1 == "fpr" {print $10; exit}')"
+          [[ "$actual" == "$SIGNING_FINGERPRINT" ]] || { echo 'Signing identity fingerprint mismatch.' >&2; exit 1; }
+          cat > "$RUNNER_TEMP/release-gpg" <<'EOF'
+          #!/usr/bin/env bash
+          exec gpg --batch --no-tty --pinentry-mode loopback --passphrase-fd 3 "$@" 3<"$GNUPGHOME/passphrase"
+          EOF
+          chmod 700 "$RUNNER_TEMP/release-gpg"
+          {
+            printf 'GNUPGHOME=%s\n' "$GNUPGHOME"
+            printf 'SIGNING_FINGERPRINT=%s\n' "$SIGNING_FINGERPRINT"
+            printf 'SIGNER_NAME=%s\nSIGNER_EMAIL=%s\n' "$SIGNER_NAME" "$SIGNER_EMAIL"
+          } >> "$GITHUB_ENV"
+          printf '%s' "$SIGNING_PASSPHRASE" > "$RUNNER_TEMP/release-gnupg/passphrase"
+          chmod 600 "$RUNNER_TEMP/release-gnupg/passphrase"
       # An installation token makes the PR trigger ordinary CI; GITHUB_TOKEN
       # generated pushes do not reliably start downstream checks.
       - name: Mint scoped pull-request installation token
@@ -392,9 +425,11 @@ jobs:
           cp "$RUNNER_TEMP/release-plan/CHANGELOG.md" CHANGELOG.md
           git config user.name 'release-changelog[bot]'
           git config user.email 'release-changelog[bot]@users.noreply.github.com'
+          git config user.signingkey "$SIGNING_FINGERPRINT"
+          git config gpg.program "$RUNNER_TEMP/release-gpg"
           git switch -c "$BRANCH"
           git add -- CHANGELOG.md
-          git commit -s -m "docs(release): prepare $TAG changelog"
+          git commit -S -s -m "docs(release): prepare $TAG changelog"
           gh auth setup-git
           git push origin "HEAD:refs/heads/$BRANCH"
           cat > "$RUNNER_TEMP/release-pr.md" <<EOF
@@ -693,12 +728,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.plan.outputs.tag }}
+          IMAGE_VERSION: ${{ needs.plan.outputs.image_version }}
         shell: bash
         run: |
           set -euo pipefail
           runs="repos/$GITHUB_REPOSITORY/actions/workflows/devcontainer-image.yml/runs?event=workflow_dispatch&per_page=100"
           before="$(gh api "$runs" --jq '[.workflow_runs[].id] | max // 0')"
-          gh workflow run devcontainer-image.yml --ref "$TAG"
+          gh workflow run devcontainer-image.yml --ref "$TAG" \
+            --field image_version="$IMAGE_VERSION" \
+            --field push_latest=true
           child=''
           for _ in {1..30}; do
             gh api "$runs" > "$RUNNER_TEMP/image-runs.json"
